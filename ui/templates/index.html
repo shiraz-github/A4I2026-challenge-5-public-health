@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobile Clinic Planner - Fulton County, GA</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    #map { height: calc(100vh - 120px); min-height: 550px; }
+    .sat-highlight { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; }
+    .sat-selected { outline: 3px solid #f59e0b; outline-offset: 2px; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased font-sans">
+
+  <!-- Header / Navigation -->
+  <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="bg-blue-600 text-white p-2.5 rounded-xl shadow-md flex items-center justify-center">
+          <i class="fa-solid fa-truck-medical text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+            Mobile Clinic Planner
+            <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+              Fulton County, GA
+            </span>
+          </h1>
+          <p class="text-xs text-slate-500">Dynamic Public Health Equity & Preventative Mobile Care Siting</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-3">
+        <div class="text-right hidden sm:block">
+          <span class="text-xs font-semibold text-slate-400 block uppercase tracking-wider">Accountability Track</span>
+          <span class="text-sm font-medium text-emerald-600 flex items-center gap-1.5 justify-end">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            BigQuery Connected
+          </span>
+        </div>
+        <button id="refreshPlanBtn" class="px-3.5 py-2 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow transition flex items-center gap-2">
+          <i class="fa-solid fa-arrows-rotate"></i> Re-calculate Plan
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      
+      <!-- Left Sidebar: Calendar & Saturday Stops (5 cols) -->
+      <div class="lg:col-span-5 space-y-4">
+        
+        <!-- Calendar Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+              <i class="fa-regular fa-calendar-days text-blue-600"></i>
+              Monthly Schedule
+            </h2>
+            <!-- Month Navigator -->
+            <div class="flex items-center space-x-1">
+              <button id="prevMonthBtn" title="Previous Month" class="w-7 h-7 flex items-center justify-center rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 transition">
+                <i class="fa-solid fa-chevron-left text-xs"></i>
+              </button>
+              <select id="monthSelect" class="text-xs font-semibold text-slate-800 bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded-md border-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
+                <option value="2026-10">October 2026</option>
+                <option value="2026-11" selected>November 2026</option>
+                <option value="2026-12">December 2026</option>
+                <option value="2027-01">January 2027</option>
+                <option value="2027-02">February 2027</option>
+                <option value="2027-03">March 2027</option>
+                <option value="2027-04">April 2027</option>
+              </select>
+              <button id="nextMonthBtn" title="Next Month" class="w-7 h-7 flex items-center justify-center rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 transition">
+                <i class="fa-solid fa-chevron-right text-xs"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div class="text-xs text-slate-500 mb-2 flex items-center justify-between">
+            <span>4 Saturdays dedicated to mobile clinic outreach</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span> Clinic Days</span>
+          </div>
+
+          <!-- Calendar Grid -->
+          <div class="grid grid-cols-7 gap-1 text-center text-xs font-medium text-slate-400 mb-1">
+            <div>Su</div><div>Mo</div><div>Tu</div><div>We</div><div>Th</div><div>Fr</div><div class="text-blue-600 font-bold">Sa</div>
+          </div>
+          <div id="calendarGrid" class="grid grid-cols-7 gap-1 text-center text-xs">
+            <!-- Dynamic calendar days inserted via JS -->
+          </div>
+        </div>
+
+        <!-- 4 Saturday Stops Accordion / Cards -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider text-slate-500">
+              Selected Saturday Clinic Sites
+            </h3>
+            <span class="text-xs bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded border border-blue-200">Optimal Siting</span>
+          </div>
+
+          <div id="stopsList" class="space-y-3">
+            <div class="text-center py-6 text-slate-400 text-sm">
+              <i class="fa-solid fa-spinner fa-spin text-lg mb-2"></i>
+              <p>Loading planned clinic stops from BigQuery...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Why These Stops? Comparative Alternatives & Trade-offs -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+              <i class="fa-solid fa-scale-balanced text-indigo-600"></i>
+              Comparative Selection Reasoning
+            </h3>
+            <span class="text-[11px] font-mono text-slate-500">vs County Baseline</span>
+          </div>
+          <p class="text-xs text-slate-600 mb-3 leading-relaxed">
+            Every tract in Fulton County (326 total) is evaluated across 3 equity criteria without using race variables. Here is how selected sites compare with deferred options:
+          </p>
+
+          <!-- County Baseline Benchmarks bar -->
+          <div class="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-center text-xs mb-3">
+            <div>
+              <span class="text-slate-400 block text-[10px]">County Avg Uninsured</span>
+              <span class="font-bold text-slate-700">11.0%</span>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px]">County Avg No-Car</span>
+              <span class="font-bold text-slate-700">11.7%</span>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px]">Avg Safety-Net Dist</span>
+              <span class="font-bold text-slate-700">6.8 km</span>
+            </div>
+          </div>
+
+          <!-- Deferred Runner-up Alternatives List -->
+          <div>
+            <div class="text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1">
+              <i class="fa-solid fa-clock-rotate-left text-slate-400"></i>
+              Next Alternate Tracts Evaluated
+            </div>
+            <div id="alternativesList" class="space-y-1.5 text-xs">
+              <!-- Dynamic alternatives from JS -->
+            </div>
+          </div>
+
+          <!-- Rejected Candidates Due to Local Events -->
+          <div class="mt-3 pt-3 border-t border-slate-200">
+            <div class="text-xs font-bold text-rose-700 mb-1.5 flex items-center justify-between">
+              <span class="flex items-center gap-1">
+                <i class="fa-solid fa-ban text-rose-500"></i>
+                Rejected Sites (Event Conflicts)
+              </span>
+              <span class="text-[10px] bg-rose-50 text-rose-600 px-1.5 py-0.2 rounded border border-rose-200">3 Cases</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mb-2 leading-relaxed">
+              High-need candidate tracts that scored in the top tier but were excluded from deployment due to verified street closures, stadium traffic, or park permits:
+            </p>
+            <div id="rejectedSitesList" class="space-y-2 text-xs">
+              <!-- Dynamic rejected sites from JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Metric Legend / Resolution Disclosure -->
+        <div class="bg-slate-100 rounded-xl p-3.5 border border-slate-200 text-xs space-y-1.5 text-slate-600">
+          <div class="font-semibold text-slate-800 flex items-center gap-1.5">
+            <i class="fa-solid fa-shield-halved text-emerald-600"></i>
+            Accountability & Non-Discrimination Guardrail
+          </div>
+          <p>
+            • <strong>Objective Ranking</strong>: Siting score exclusively aggregates Uninsured Rate (40%), Transit Barrier (35%), and Clinic Distance Disparity (25%).
+          </p>
+          <p class="text-emerald-900 bg-emerald-50 p-2 rounded border border-emerald-200 text-[11px] leading-relaxed">
+            <strong>Audit Guarantee:</strong> Demographics are held out entirely during site generation to prevent algorithmic redlining. The independent Equity Auditor reviews results after siting.
+          </p>
+        </div>
+
+        <!-- 3-Agent Autonomous System Panel -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="bg-gradient-to-r from-purple-800 to-indigo-800 px-4 py-3 text-white flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <i class="fa-solid fa-network-wired text-purple-200 text-sm"></i>
+              <div>
+                <h3 class="font-bold text-sm leading-tight">3-Agent Pipeline</h3>
+                <p class="text-[11px] text-purple-200">Siting → Equity Audit → Community Explainer</p>
+              </div>
+            </div>
+            <button id="runPipelineBtn" class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold px-2.5 py-1 rounded transition flex items-center gap-1 shadow-xs">
+              <i class="fa-solid fa-play text-[10px]"></i> Run Pipeline
+            </button>
+          </div>
+
+          <div class="p-3.5 space-y-3 text-xs">
+            <!-- Flow Diagram Indicator -->
+            <div class="bg-purple-50/70 p-2.5 rounded-lg border border-purple-100 font-mono text-[11px] text-purple-900 space-y-1">
+              <div>1. <strong>Siting Agent</strong>: Plans 4 Saturday stops based on Need & Hurdle</div>
+              <div class="text-slate-400 pl-4">↳ writes <code>proposed_schedule</code> to state</div>
+              <div>2. <strong>Equity Auditor Agent</strong>: Audits demographics & language access</div>
+              <div class="text-slate-400 pl-4">↳ validates and writes <code>approved_schedule</code> + <code>audit_report</code></div>
+              <div>3. <strong>Community Explainer Agent</strong>: Generates English & Spanish flyers</div>
+            </div>
+
+            <!-- Pipeline Status / Results Container -->
+            <div id="pipelineOutputContainer" class="hidden space-y-2.5">
+              <!-- Audit Verdict -->
+              <div class="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg">
+                <div class="flex items-center justify-between font-bold text-emerald-800 text-[11px]">
+                  <span>Equity Audit Verdict</span>
+                  <span id="pipelineAuditScore" class="bg-emerald-200 text-emerald-900 px-1.5 py-0.2 rounded font-mono">Score: 95.0</span>
+                </div>
+                <p id="pipelineAuditVerdict" class="text-emerald-900 text-[11px] mt-1 leading-snug"></p>
+                <div id="pipelineAuditFindings" class="mt-1.5 space-y-1 text-[10px] text-emerald-800 border-t border-emerald-200/60 pt-1.5"></div>
+              </div>
+
+              <!-- Community Explainer Flyers Accordion -->
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <span class="font-bold text-slate-700 text-xs">Community Outreach Flyers</span>
+                  <div class="flex gap-1">
+                    <button id="showFlierEnBtn" class="bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] font-semibold">English</button>
+                    <button id="showFlierEsBtn" class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-[10px] font-semibold">Español</button>
+                  </div>
+                </div>
+                <div id="flierContentBox" class="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-700 leading-relaxed font-sans max-h-48 overflow-y-auto whitespace-pre-wrap"></div>
+              </div>
+            </div>
+
+            <div id="pipelineIdlePrompt" class="text-slate-400 italic text-[11px] text-center py-1">
+              Click 'Run Pipeline' to trigger autonomous multi-agent coordination.
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Main: Map & Geospatial View (7 cols) -->
+      <div class="lg:col-span-7">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
+          
+          <!-- Map Control Bar -->
+          <div class="bg-white border-b border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between text-xs gap-2 z-10 relative">
+            <div class="flex items-center space-x-2">
+              <span class="font-bold text-slate-700 flex items-center gap-1">
+                <i class="fa-solid fa-map-location-dot text-blue-600"></i> Fulton County Map
+              </span>
+              <span id="tractCountBadge" class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-mono text-[11px]">326 Tracts</span>
+            </div>
+            <!-- Layer Toggles -->
+            <div class="flex items-center space-x-3">
+              <label class="inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="toggleTracts" checked class="rounded text-blue-600 focus:ring-blue-500 h-3.5 w-3.5">
+                <span class="ml-1.5 font-medium text-slate-700 flex items-center gap-1">
+                  <span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block border border-white shadow-xs"></span>
+                  Tract Centroids (326)
+                </span>
+              </label>
+              <label class="inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="toggleCareSites" checked class="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5">
+                <span class="ml-1.5 font-medium text-slate-700 flex items-center gap-1">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block border border-white shadow-xs"></span>
+                  Care Sites (67)
+                </span>
+              </label>
+              <label class="inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="toggleRejected" checked class="rounded text-rose-600 focus:ring-rose-500 h-3.5 w-3.5">
+                <span class="ml-1.5 font-medium text-slate-700 flex items-center gap-1">
+                  <span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block border border-white shadow-xs"></span>
+                  Rejected Spots (3)
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Leaflet Map Container -->
+          <div id="map"></div>
+
+          <!-- Floating Selected Stop Badge on Map -->
+          <div id="activeStopOverlay" class="absolute bottom-4 left-4 right-4 sm:right-auto sm:max-w-md bg-white/95 backdrop-blur-md p-3.5 rounded-xl border border-slate-300 shadow-xl z-[1000] hidden">
+            <div class="flex items-start justify-between">
+              <div>
+                <span id="overlayDate" class="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded uppercase">Saturday Stop</span>
+                <h4 id="overlayTract" class="text-sm font-bold text-slate-900 mt-1">Tract ID</h4>
+              </div>
+              <button onclick="closeOverlay()" class="text-slate-400 hover:text-slate-600 p-1">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <p id="overlayRationale" class="text-xs text-slate-600 mt-1.5 leading-relaxed"></p>
+            <div class="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-100 text-center text-xs">
+              <div>
+                <span class="text-slate-400 block text-[10px]">Uninsured</span>
+                <span id="overlayUninsured" class="font-bold text-red-600">--%</span>
+              </div>
+              <div>
+                <span class="text-slate-400 block text-[10px]">No Vehicle</span>
+                <span id="overlayNoVehicle" class="font-bold text-amber-600">--%</span>
+              </div>
+              <div>
+                <span class="text-slate-400 block text-[10px]">Safety-Net Dist</span>
+                <span id="overlayDistance" class="font-bold text-blue-600">-- km</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- My Clinic Assistant Agent Panel -->
+        <div class="mt-5 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 px-4 py-3 text-white flex items-center justify-between">
+            <div class="flex items-center space-x-2.5">
+              <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center border border-white/20">
+                <i class="fa-solid fa-robot text-blue-200 text-sm"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-sm leading-tight flex items-center gap-1.5">
+                  My Clinic Assistant
+                  <span class="text-[10px] bg-emerald-400/20 text-emerald-200 border border-emerald-400/30 px-1.5 py-0.2 rounded-full font-normal">Active Agent</span>
+                </h3>
+                <p class="text-[11px] text-blue-200">Natural language search & BigQuery data queries</p>
+              </div>
+            </div>
+            <span class="text-[11px] font-mono bg-black/20 px-2 py-0.5 rounded text-blue-100">Gemini 2.5 + BigQuery Tools</span>
+          </div>
+
+          <!-- Suggested Quick Prompts -->
+          <div class="px-4 py-2 bg-slate-50 border-b border-slate-100 flex flex-wrap gap-1.5 text-xs">
+            <span class="text-slate-400 self-center text-[11px]">Try asking:</span>
+            <button onclick="setQueryPrompt('Which tracts in Fulton County have over 30% uninsured rate?')" class="bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 px-2.5 py-1 rounded-md border border-slate-200 text-[11px] transition shadow-2xs">
+              "Tracts >30% uninsured"
+            </button>
+            <button onclick="setQueryPrompt('Which tracts are furthest from safety-net clinics?')" class="bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 px-2.5 py-1 rounded-md border border-slate-200 text-[11px] transition shadow-2xs">
+              "Furthest from safety-net clinics"
+            </button>
+            <button onclick="setQueryPrompt('How many FQHC sites are in Fulton County and where are they located?')" class="bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 px-2.5 py-1 rounded-md border border-slate-200 text-[11px] transition shadow-2xs">
+              "FQHC site breakdown"
+            </button>
+            <button onclick="setQueryPrompt('What is the average diabetes and asthma prevalence in high uninsured tracts?')" class="bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 px-2.5 py-1 rounded-md border border-slate-200 text-[11px] transition shadow-2xs">
+              "Chronic disease prevalence"
+            </button>
+          </div>
+
+          <!-- Chat Conversation Log -->
+          <div id="assistantChatLog" class="p-4 space-y-3 max-h-80 overflow-y-auto text-xs bg-slate-50/50">
+            <!-- Welcome message from agent -->
+            <div class="flex items-start gap-2.5">
+              <div class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 text-[10px] font-bold">
+                AI
+              </div>
+              <div class="bg-white p-3 rounded-xl border border-slate-200 text-slate-700 max-w-xl shadow-2xs leading-relaxed">
+                Hello! I am <strong>My Clinic Assistant</strong>. You can ask me anything about Fulton County census tracts, uninsured rates, vehicle isolation, disease burdens, or clinic accessibility. I query BigQuery live to answer your questions.
+              </div>
+            </div>
+          </div>
+
+          <!-- Chat Input Form -->
+          <form id="assistantChatForm" class="p-3 bg-white border-t border-slate-200 flex items-center gap-2">
+            <input 
+              type="text" 
+              id="assistantQueryInput" 
+              placeholder="Ask My Clinic Assistant (e.g. 'Show tracts with severe transit deserts and high diabetes')..." 
+              class="flex-1 text-xs px-3.5 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-slate-50"
+              autocomplete="off"
+            />
+            <button 
+              type="submit" 
+              id="assistantSendBtn"
+              class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-lg transition shadow-xs flex items-center gap-1.5 shrink-0"
+            >
+              <span>Ask</span>
+              <i class="fa-solid fa-paper-plane text-[10px]"></i>
+            </button>
+          </form>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <script src="static/app.js"></script>
+</body>
+</html>
