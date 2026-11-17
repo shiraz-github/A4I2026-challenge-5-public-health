@@ -12,76 +12,238 @@
   <!-- FontAwesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    #map { height: calc(100vh - 120px); min-height: 550px; }
-    .sat-highlight { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; }
-    .sat-selected { outline: 3px solid #f59e0b; outline-offset: 2px; }
+    /* -------------------------------------------------------------
+       Apple Human Interface Design System (WWDC Guidelines & HIG)
+       Materials, SF Pro Typography, Translucency & Springs
+    ------------------------------------------------------------- */
+    :root {
+      --font-apple: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      --apple-bg: #ececf1;
+      --apple-card-bg: rgba(255, 255, 255, 0.85);
+      --apple-chrome-bg: rgba(255, 255, 255, 0.88);
+      --apple-border: rgba(0, 0, 0, 0.08);
+      --apple-border-light: rgba(255, 255, 255, 0.8);
+      --apple-shadow-sm: 0 4px 14px 0 rgba(0, 0, 0, 0.05), 0 1px 3px 0 rgba(0, 0, 0, 0.03);
+      --apple-shadow-md: 0 10px 30px -4px rgba(0, 0, 0, 0.08), 0 4px 10px -2px rgba(0, 0, 0, 0.04);
+      --apple-shadow-lg: 0 20px 45px -10px rgba(0, 0, 0, 0.12), 0 8px 16px -4px rgba(0, 0, 0, 0.06);
+      --apple-blue: #0071e3;
+      --apple-blue-hover: #0077ed;
+      --apple-emerald: #34c759;
+      --apple-rose: #ff3b30;
+      --apple-amber: #ff9500;
+      --apple-purple: #af52de;
+    }
+
+    body {
+      font-family: var(--font-apple);
+      background: radial-gradient(120% 120% at 50% 0%, #fbfbfd 0%, #f2f2f7 50%, #e5e5ea 100%) fixed;
+      color: #1d1d1f;
+      letter-spacing: -0.014em;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      min-height: 100vh;
+    }
+
+    /* Apple Heading Optical Tracking & Weights */
+    h1, h2, h3, h4, .apple-title {
+      letter-spacing: -0.03em;
+      font-weight: 700;
+      color: #1d1d1f;
+    }
+    .apple-headline {
+      letter-spacing: -0.022em;
+      font-weight: 600;
+    }
+
+    /* Apple Translucent Materials (Frosted Glass with light reflection rim) */
+    .apple-glass {
+      background: rgba(255, 255, 255, 0.76) !important;
+      backdrop-filter: blur(30px) saturate(210%) !important;
+      -webkit-backdrop-filter: blur(30px) saturate(210%) !important;
+      border: 1px solid rgba(255, 255, 255, 0.9) !important;
+      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+    }
+    .apple-glass-chrome {
+      background: rgba(255, 255, 255, 0.82) !important;
+      backdrop-filter: blur(32px) saturate(210%) !important;
+      -webkit-backdrop-filter: blur(32px) saturate(210%) !important;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03) !important;
+    }
+    .apple-card {
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(28px) saturate(200%);
+      -webkit-backdrop-filter: blur(28px) saturate(200%);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      box-shadow: 0 6px 24px -2px rgba(0, 0, 0, 0.06), 0 1px 4px 0 rgba(0, 0, 0, 0.03), inset 0 1px 0 0 rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .apple-card:hover {
+      box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.09), 0 2px 6px 0 rgba(0, 0, 0, 0.04), inset 0 1px 0 0 rgba(255, 255, 255, 1);
+      border-color: rgba(0, 113, 227, 0.3);
+    }
+
+    /* Apple macOS Control Strip */
+    .apple-segmented-group {
+      background: rgba(118, 118, 128, 0.12);
+      border-radius: 980px;
+      padding: 3px;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    /* Physical Micro-interactions & Press Response */
+    button, .interactive-btn {
+      transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.15s ease, box-shadow 0.2s ease;
+      touch-action: manipulation;
+    }
+    button:active, .interactive-btn:active {
+      transform: scale(0.97);
+    }
+
+    /* Apple Standard Rounded Pills & Badges */
+    .apple-pill {
+      border-radius: 980px;
+      padding: 4px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+
+    /* Calendar Sat Highlight in Apple Blue */
+    .sat-highlight {
+      background: linear-gradient(180deg, #0077ed 0%, #0064cb 100%) !important;
+      color: white !important;
+      border-radius: 14px !important;
+      box-shadow: 0 4px 14px rgba(0, 113, 227, 0.45) !important;
+      border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    }
+    .sat-highlight:hover {
+      transform: scale(1.05) !important;
+    }
+
+    #map {
+      height: calc(100vh - 120px);
+      min-height: 580px;
+      border-radius: 20px;
+    }
+
+    /* Custom Apple Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.35);
+    }
+
+    /* Smooth Modal Transitions */
+    .modal-backdrop-blur {
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 antialiased font-sans">
+<body class="antialiased">
 
-  <!-- Header / Navigation -->
-  <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-30">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
-      <div class="flex items-center space-x-3">
-        <div class="bg-blue-600 text-white p-2.5 rounded-xl shadow-md flex items-center justify-center">
-          <i class="fa-solid fa-truck-medical text-xl"></i>
+  <!-- Apple Translucent Header / Navigation -->
+  <header class="apple-glass-chrome sticky top-0 z-30 transition-all">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between">
+      <div class="flex items-center space-x-3.5">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-b from-blue-500 to-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 border border-white/25">
+          <i class="fa-solid fa-truck-medical text-lg"></i>
         </div>
         <div>
-          <h1 class="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+          <h1 class="text-lg sm:text-xl font-semibold text-slate-900 tracking-tight flex items-center gap-2">
             Mobile Clinic Planner
-            <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
-              Fulton County, GA
-            </span>
+            <!-- County Selector Dropdown (Apple Pill Style) -->
+            <div class="relative inline-block">
+              <select id="countySelect" class="apple-pill bg-blue-500/10 hover:bg-blue-500/15 text-blue-700 border border-blue-500/25 font-semibold text-xs py-1 px-2.5 rounded-full cursor-pointer focus:ring-2 focus:ring-[#0071e3] transition shadow-2xs">
+                <option value="13121" selected>Fulton County, GA (Atlanta)</option>
+                <option value="17031">Cook County, IL (Chicago)</option>
+                <option value="06085">Santa Clara County, CA (Sunnyvale)</option>
+                <option value="36005">Bronx County, NY (New York City)</option>
+                <option value="48201">Harris County, TX (Houston)</option>
+                <option value="48453">Travis County, TX (Austin)</option>
+              </select>
+            </div>
           </h1>
-          <p class="text-xs text-slate-500">Dynamic Public Health Equity & Preventative Mobile Care Siting</p>
+          <p class="text-[12px] text-slate-500 font-normal" id="countySubheader">Dynamic Public Health Equity & Preventative Mobile Care Siting • Fulton County, GA</p>
         </div>
       </div>
       <div class="flex items-center space-x-3">
         <div class="text-right hidden sm:block">
-          <span class="text-xs font-semibold text-slate-400 block uppercase tracking-wider">Accountability Track</span>
-          <span class="text-sm font-medium text-emerald-600 flex items-center gap-1.5 justify-end">
+          <span class="text-[11px] font-semibold text-slate-400 block uppercase tracking-wider">Accountability Track</span>
+          <span class="text-xs font-semibold text-emerald-600 flex items-center gap-1.5 justify-end">
             <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            BigQuery Connected
+            BigQuery Live
           </span>
         </div>
-        <button id="refreshPlanBtn" class="px-3.5 py-2 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow transition flex items-center gap-2">
-          <i class="fa-solid fa-arrows-rotate"></i> Re-calculate Plan
+        <button id="refreshPlanBtn" class="px-4 py-2 text-xs font-semibold text-white bg-[#0071e3] hover:bg-[#0077ed] rounded-full shadow-xs transition flex items-center gap-1.5 active:scale-95">
+          <i class="fa-solid fa-arrows-rotate text-[11px]"></i> Re-calculate Plan
         </button>
       </div>
     </div>
   </header>
 
   <!-- Main Content Layout -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
       
       <!-- Left Sidebar: Calendar & Saturday Stops (5 cols) -->
-      <div class="lg:col-span-5 space-y-4">
+      <div class="lg:col-span-5 space-y-5">
         
         <!-- Calendar Card -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <div class="flex items-center justify-between mb-3">
-            <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+        <div class="apple-card p-5">
+          <div class="flex items-center justify-between mb-3.5">
+            <h2 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
               <i class="fa-regular fa-calendar-days text-blue-600"></i>
               Monthly Schedule
             </h2>
-            <!-- Month Navigator -->
-            <div class="flex items-center space-x-1">
-              <button id="prevMonthBtn" title="Previous Month" class="w-7 h-7 flex items-center justify-center rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 transition">
-                <i class="fa-solid fa-chevron-left text-xs"></i>
-              </button>
-              <select id="monthSelect" class="text-xs font-semibold text-slate-800 bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded-md border-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
-                <option value="2026-10">October 2026</option>
-                <option value="2026-11" selected>November 2026</option>
-                <option value="2026-12">December 2026</option>
-                <option value="2027-01">January 2027</option>
-                <option value="2027-02">February 2027</option>
-                <option value="2027-03">March 2027</option>
-                <option value="2027-04">April 2027</option>
-              </select>
-              <button id="nextMonthBtn" title="Next Month" class="w-7 h-7 flex items-center justify-center rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 transition">
-                <i class="fa-solid fa-chevron-right text-xs"></i>
-              </button>
+            <!-- Weather & Month Controls -->
+            <div class="flex items-center space-x-2">
+              <!-- Weather Adaptive Segmented Control -->
+              <div class="flex items-center bg-slate-100/90 p-0.5 rounded-xl border border-black/5 text-xs">
+                <button type="button" id="weatherClearBtn" title="Clear Weather: Open Civic Plazas" class="px-2.5 py-1 rounded-lg font-semibold text-[#0071e3] bg-white shadow-2xs transition flex items-center gap-1 active:scale-95 text-[11px]">
+                  <i class="fa-solid fa-sun text-amber-500"></i> Clear
+                </button>
+                <button type="button" id="weatherRainBtn" title="Rain Contingency: Indoor Covered Parking Decks" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition flex items-center gap-1 active:scale-95 text-[11px]">
+                  <i class="fa-solid fa-cloud-rain text-blue-500"></i> Rain (Indoor)
+                </button>
+              </div>
+
+              <!-- Month Navigator -->
+              <div class="flex items-center space-x-1 bg-slate-100/80 p-0.5 rounded-xl border border-black/5">
+                <button id="prevMonthBtn" title="Previous Month" class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white text-slate-600 transition shadow-2xs">
+                  <i class="fa-solid fa-chevron-left text-xs"></i>
+                </button>
+                <select id="monthSelect" class="text-xs font-medium text-slate-800 bg-transparent px-2 py-1 rounded-lg border-none focus:ring-0 cursor-pointer">
+                  <option value="2026-10">October 2026</option>
+                  <option value="2026-11" selected>November 2026</option>
+                  <option value="2026-12">December 2026</option>
+                  <option value="2027-01">January 2027</option>
+                  <option value="2027-02">February 2027</option>
+                  <option value="2027-03">March 2027</option>
+                  <option value="2027-04">April 2027</option>
+                </select>
+                <button id="nextMonthBtn" title="Next Month" class="w-7 h-7 flex items-center justify-center rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 transition">
+                  <i class="fa-solid fa-chevron-right text-xs"></i>
+                </button>
+              </div>
             </div>
           </div>
           
@@ -99,16 +261,59 @@
           </div>
         </div>
 
-        <!-- 4 Saturday Stops Accordion / Cards -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+        <!-- Dedicated Community Outreach Flyers (Top 3 Languages) -->
+        <div class="apple-card p-5">
           <div class="flex items-center justify-between mb-3">
-            <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider text-slate-500">
-              Selected Saturday Clinic Sites
-            </h3>
-            <span class="text-xs bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded border border-blue-200">Optimal Siting</span>
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-xl bg-purple-500/10 text-purple-700 flex items-center justify-center text-xs">
+                <i class="fa-solid fa-bullhorn"></i>
+              </div>
+              <div>
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-900">
+                  Community Outreach Flyers
+                </h3>
+                <p class="text-[11px] text-slate-500">Plain-language (6th-grade reading level) for local residents</p>
+              </div>
+            </div>
+            <!-- Language Pills (Top 3 Languages in BigQuery) -->
+            <div class="flex gap-1 bg-slate-100/90 p-0.5 rounded-xl border border-black/5">
+              <button id="mainFlierEnBtn" class="bg-[#0071e3] text-white px-2.5 py-1 rounded-lg text-[11px] font-semibold transition shadow-2xs">English</button>
+              <button id="mainFlierEsBtn" class="text-slate-600 hover:text-slate-900 px-2.5 py-1 rounded-lg text-[11px] font-medium transition">Español</button>
+              <button id="mainFlierViBtn" class="text-slate-600 hover:text-slate-900 px-2.5 py-1 rounded-lg text-[11px] font-medium transition">Tiếng Việt</button>
+            </div>
           </div>
 
-          <div id="stopsList" class="space-y-3">
+          <!-- Flyer Preview Box -->
+          <div id="mainFlierContentBox" class="p-3.5 bg-slate-50/80 border border-black/5 rounded-2xl text-[12px] text-slate-800 leading-relaxed font-sans max-h-56 overflow-y-auto whitespace-pre-wrap shadow-2xs">
+            Loading plain-language flyers...
+          </div>
+
+          <!-- Flyer Action Bar -->
+          <div class="mt-3 flex items-center justify-between pt-2.5 border-t border-black/5 text-[11px]">
+            <span class="text-slate-500 text-[10px] flex items-center gap-1">
+              <i class="fa-solid fa-language text-purple-600"></i> Top 3 Fulton County Immigrant Languages
+            </span>
+            <div class="flex gap-2">
+              <button id="copyFlierBtn" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition flex items-center gap-1 active:scale-95">
+                <i class="fa-regular fa-copy text-[10px]"></i> Copy Text
+              </button>
+              <button id="printFlierBtn" class="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-[#0071e3] font-semibold rounded-xl transition flex items-center gap-1 border border-blue-500/20 active:scale-95">
+                <i class="fa-solid fa-print text-[10px]"></i> Print Flyer
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4 Saturday Stops Accordion / Cards -->
+        <div class="apple-card p-5">
+          <div class="flex items-center justify-between mb-3.5">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Selected Saturday Clinic Sites
+            </h3>
+            <span class="apple-pill bg-blue-500/10 text-blue-700 border border-blue-500/20">Optimal Siting</span>
+          </div>
+
+          <div id="stopsList" class="space-y-3.5">
             <div class="text-center py-6 text-slate-400 text-sm">
               <i class="fa-solid fa-spinner fa-spin text-lg mb-2"></i>
               <p>Loading planned clinic stops from BigQuery...</p>
@@ -117,9 +322,9 @@
         </div>
 
         <!-- Why These Stops? Comparative Alternatives & Trade-offs -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+        <div class="apple-card p-5">
           <div class="flex items-center justify-between mb-2">
-            <h3 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+            <h3 class="text-sm font-semibold text-slate-900 flex items-center gap-1.5">
               <i class="fa-solid fa-scale-balanced text-indigo-600"></i>
               Comparative Selection Reasoning
             </h3>
@@ -225,16 +430,26 @@
                 <div id="pipelineAuditFindings" class="mt-1.5 space-y-1 text-[10px] text-emerald-800 border-t border-emerald-200/60 pt-1.5"></div>
               </div>
 
-              <!-- Community Explainer Flyers Accordion -->
+              <!-- Weekly Siting vs Auditor Decision Matrix (from MVP Guide) -->
+              <div class="border border-indigo-100 rounded-lg p-2.5 bg-indigo-50/50">
+                <div class="font-bold text-slate-800 text-[11px] mb-1.5 flex items-center justify-between">
+                  <span>Weekly Siting vs Auditor Decision Matrix</span>
+                  <span class="text-[9px] bg-indigo-100 text-indigo-700 px-1 py-0.2 rounded font-mono">Adversarial Loop</span>
+                </div>
+                <div id="weeklyDecisionMatrix" class="space-y-1.5 text-[10px]"></div>
+              </div>
+
+              <!-- Community Outreach Flyers (English, Español, Tiếng Việt) -->
               <div>
-                <div class="flex items-center justify-between mb-1">
-                  <span class="font-bold text-slate-700 text-xs">Community Outreach Flyers</span>
-                  <div class="flex gap-1">
-                    <button id="showFlierEnBtn" class="bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] font-semibold">English</button>
-                    <button id="showFlierEsBtn" class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-[10px] font-semibold">Español</button>
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="font-semibold text-slate-700 text-xs">Community Outreach Flyers (Top 3 Langs)</span>
+                  <div class="flex gap-1 bg-slate-100 p-0.5 rounded-xl border border-black/5">
+                    <button id="showFlierEnBtn" class="bg-[#0071e3] text-white px-2.5 py-0.5 rounded-lg text-[10px] font-semibold transition shadow-2xs">English</button>
+                    <button id="showFlierEsBtn" class="text-slate-600 hover:text-slate-900 px-2.5 py-0.5 rounded-lg text-[10px] font-medium transition">Español</button>
+                    <button id="showFlierViBtn" class="text-slate-600 hover:text-slate-900 px-2.5 py-0.5 rounded-lg text-[10px] font-medium transition">Tiếng Việt</button>
                   </div>
                 </div>
-                <div id="flierContentBox" class="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-700 leading-relaxed font-sans max-h-48 overflow-y-auto whitespace-pre-wrap"></div>
+                <div id="flierContentBox" class="p-3 bg-white/80 border border-black/5 rounded-xl text-[11px] text-slate-700 leading-relaxed font-sans max-h-48 overflow-y-auto whitespace-pre-wrap shadow-2xs"></div>
               </div>
             </div>
 
@@ -248,37 +463,47 @@
 
       <!-- Right Main: Map & Geospatial View (7 cols) -->
       <div class="lg:col-span-7">
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
+        <div class="apple-card overflow-hidden relative">
           
-          <!-- Map Control Bar -->
-          <div class="bg-white border-b border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between text-xs gap-2 z-10 relative">
+          <!-- Apple Toolbar with Translucent Material -->
+          <div class="apple-glass-chrome px-4 py-3 flex flex-wrap items-center justify-between text-xs gap-2 z-10 relative">
             <div class="flex items-center space-x-2">
-              <span class="font-bold text-slate-700 flex items-center gap-1">
-                <i class="fa-solid fa-map-location-dot text-blue-600"></i> Fulton County Map
+              <span class="font-semibold text-slate-900 flex items-center gap-1.5">
+                <i class="fa-solid fa-map-location-dot text-[#0071e3]"></i> <span id="mapCountyTitle">Google Maps (Fulton County)</span>
               </span>
-              <span id="tractCountBadge" class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-mono text-[11px]">326 Tracts</span>
+              <span id="tractCountBadge" class="apple-pill bg-slate-200/60 text-slate-700 font-mono text-[10px]">326 Tracts</span>
+              <span class="apple-pill bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[10px] font-semibold flex items-center gap-1">
+                <i class="fa-brands fa-google text-[#0071e3]"></i> Google Maps
+              </span>
             </div>
-            <!-- Layer Toggles -->
-            <div class="flex items-center space-x-3">
-              <label class="inline-flex items-center cursor-pointer">
-                <input type="checkbox" id="toggleTracts" checked class="rounded text-blue-600 focus:ring-blue-500 h-3.5 w-3.5">
-                <span class="ml-1.5 font-medium text-slate-700 flex items-center gap-1">
-                  <span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block border border-white shadow-xs"></span>
-                  Tract Centroids (326)
+            <!-- Segmented Layer Toggles -->
+            <div class="flex items-center space-x-2.5">
+              <label class="apple-pill bg-white/70 hover:bg-white border border-black/5 shadow-2xs cursor-pointer transition">
+                <input type="checkbox" id="toggleTracts" checked class="rounded text-[#0071e3] focus:ring-0 h-3.5 w-3.5">
+                <span class="font-medium text-slate-700 flex items-center gap-1">
+                  <span class="w-2 h-2 rounded-full bg-blue-500 inline-block shadow-2xs"></span>
+                  Centroids (326)
                 </span>
               </label>
-              <label class="inline-flex items-center cursor-pointer">
-                <input type="checkbox" id="toggleCareSites" checked class="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5">
-                <span class="ml-1.5 font-medium text-slate-700 flex items-center gap-1">
-                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block border border-white shadow-xs"></span>
+              <label class="apple-pill bg-white/70 hover:bg-white border border-black/5 shadow-2xs cursor-pointer transition">
+                <input type="checkbox" id="toggleCareSites" checked class="rounded text-[#34c759] focus:ring-0 h-3.5 w-3.5">
+                <span class="font-medium text-slate-700 flex items-center gap-1">
+                  <span class="w-2 h-2 rounded-full bg-[#34c759] inline-block shadow-2xs"></span>
                   Care Sites (67)
                 </span>
               </label>
-              <label class="inline-flex items-center cursor-pointer">
-                <input type="checkbox" id="toggleRejected" checked class="rounded text-rose-600 focus:ring-rose-500 h-3.5 w-3.5">
-                <span class="ml-1.5 font-medium text-slate-700 flex items-center gap-1">
-                  <span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block border border-white shadow-xs"></span>
-                  Rejected Spots (3)
+              <label class="apple-pill bg-white/70 hover:bg-white border border-black/5 shadow-2xs cursor-pointer transition">
+                <input type="checkbox" id="toggleRejected" checked class="rounded text-[#ff3b30] focus:ring-0 h-3.5 w-3.5">
+                <span class="font-medium text-slate-700 flex items-center gap-1">
+                  <span class="w-2 h-2 rounded-full bg-[#ff3b30] inline-block shadow-2xs"></span>
+                  Rejected (3)
+                </span>
+              </label>
+              <label class="apple-pill bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 shadow-2xs cursor-pointer transition">
+                <input type="checkbox" id="toggleVetoPins" class="rounded text-amber-600 focus:ring-0 h-3.5 w-3.5">
+                <span class="font-semibold text-amber-800 flex items-center gap-1">
+                  <span class="w-2 h-2 rounded-full bg-amber-500 inline-block shadow-2xs"></span>
+                  Veto Pins
                 </span>
               </label>
             </div>
@@ -287,97 +512,98 @@
           <!-- Leaflet Map Container -->
           <div id="map"></div>
 
-          <!-- Floating Selected Stop Badge on Map -->
-          <div id="activeStopOverlay" class="absolute bottom-4 left-4 right-4 sm:right-auto sm:max-w-md bg-white/95 backdrop-blur-md p-3.5 rounded-xl border border-slate-300 shadow-xl z-[1000] hidden">
+          <!-- Floating Selected Stop Badge on Map (Apple Floating Sheet) -->
+          <div id="activeStopOverlay" class="absolute bottom-5 left-5 right-5 sm:right-auto sm:max-w-md apple-glass p-4 rounded-2xl shadow-xl z-[1000] hidden border border-white/60">
             <div class="flex items-start justify-between">
               <div>
-                <span id="overlayDate" class="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded uppercase">Saturday Stop</span>
-                <h4 id="overlayTract" class="text-sm font-bold text-slate-900 mt-1">Tract ID</h4>
+                <span id="overlayDate" class="apple-pill bg-blue-500/10 text-blue-700 border border-blue-500/20 uppercase font-semibold">Saturday Stop</span>
+                <span id="overlayFacility" class="apple-pill bg-purple-500/10 text-purple-700 border border-purple-500/20 font-medium ml-1 text-[10px]">Parking</span>
+                <h4 id="overlayTract" class="text-sm font-semibold text-slate-900 mt-1.5">Tract ID</h4>
               </div>
-              <button onclick="closeOverlay()" class="text-slate-400 hover:text-slate-600 p-1">
+              <button onclick="closeOverlay()" class="w-6 h-6 rounded-full bg-slate-200/60 hover:bg-slate-300/80 text-slate-500 hover:text-slate-700 flex items-center justify-center text-xs transition">
                 <i class="fa-solid fa-xmark"></i>
               </button>
             </div>
-            <p id="overlayRationale" class="text-xs text-slate-600 mt-1.5 leading-relaxed"></p>
-            <div class="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-100 text-center text-xs">
-              <div>
-                <span class="text-slate-400 block text-[10px]">Uninsured</span>
-                <span id="overlayUninsured" class="font-bold text-red-600">--%</span>
+            <p id="overlayRationale" class="text-xs text-slate-600 mt-2 leading-relaxed"></p>
+            <div class="grid grid-cols-3 gap-2 mt-2.5 pt-2.5 border-t border-black/5 text-center text-xs">
+              <div class="bg-white/60 p-1.5 rounded-xl border border-black/5">
+                <span class="text-slate-400 block text-[9px] uppercase tracking-tight">Uninsured</span>
+                <span id="overlayUninsured" class="font-semibold text-[#ff3b30]">--%</span>
               </div>
-              <div>
-                <span class="text-slate-400 block text-[10px]">No Vehicle</span>
-                <span id="overlayNoVehicle" class="font-bold text-amber-600">--%</span>
+              <div class="bg-white/60 p-1.5 rounded-xl border border-black/5">
+                <span class="text-slate-400 block text-[9px] uppercase tracking-tight">No Vehicle</span>
+                <span id="overlayNoVehicle" class="font-semibold text-amber-600">--%</span>
               </div>
-              <div>
-                <span class="text-slate-400 block text-[10px]">Safety-Net Dist</span>
-                <span id="overlayDistance" class="font-bold text-blue-600">-- km</span>
+              <div class="bg-white/60 p-1.5 rounded-xl border border-black/5">
+                <span class="text-slate-400 block text-[9px] uppercase tracking-tight">Safety-Net</span>
+                <span id="overlayDistance" class="font-semibold text-[#0071e3]">-- km</span>
               </div>
             </div>
           </div>
 
         </div>
 
-        <!-- My Clinic Assistant Agent Panel -->
-        <div class="mt-5 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 px-4 py-3 text-white flex items-center justify-between">
-            <div class="flex items-center space-x-2.5">
-              <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center border border-white/20">
-                <i class="fa-solid fa-robot text-blue-200 text-sm"></i>
+        <!-- My Clinic Assistant Agent Panel (Apple Card Aesthetic) -->
+        <div class="mt-5 apple-card overflow-hidden">
+          <div class="apple-glass-chrome px-5 py-3.5 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+              <div class="w-8 h-8 rounded-xl bg-gradient-to-b from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-xs">
+                <i class="fa-solid fa-sparkles text-xs"></i>
               </div>
               <div>
-                <h3 class="font-bold text-sm leading-tight flex items-center gap-1.5">
+                <h3 class="font-semibold text-sm text-slate-900 leading-tight flex items-center gap-1.5">
                   My Clinic Assistant
-                  <span class="text-[10px] bg-emerald-400/20 text-emerald-200 border border-emerald-400/30 px-1.5 py-0.2 rounded-full font-normal">Active Agent</span>
+                  <span class="apple-pill bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[10px]">Active</span>
                 </h3>
-                <p class="text-[11px] text-blue-200">Natural language search & BigQuery data queries</p>
+                <p class="text-[11px] text-slate-500">Natural language search & BigQuery queries</p>
               </div>
             </div>
-            <span class="text-[11px] font-mono bg-black/20 px-2 py-0.5 rounded text-blue-100">Gemini 2.5 + BigQuery Tools</span>
+            <span class="apple-pill bg-slate-100 text-slate-600 font-mono text-[10px]">Gemini 2.5 + Tools</span>
           </div>
 
           <!-- Suggested Quick Prompts -->
-          <div class="px-4 py-2 bg-slate-50 border-b border-slate-100 flex flex-wrap gap-1.5 text-xs">
+          <div class="px-5 py-2.5 bg-slate-50/70 border-b border-black/5 flex flex-wrap gap-2 text-xs">
             <span class="text-slate-400 self-center text-[11px]">Try asking:</span>
-            <button onclick="setQueryPrompt('Which tracts in Fulton County have over 30% uninsured rate?')" class="bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 px-2.5 py-1 rounded-md border border-slate-200 text-[11px] transition shadow-2xs">
+            <button onclick="setQueryPrompt('Which tracts in Fulton County have over 30% uninsured rate?')" class="apple-pill bg-white hover:bg-blue-50 text-slate-700 hover:text-[#0071e3] border border-black/5 text-[11px] transition shadow-2xs">
               "Tracts >30% uninsured"
             </button>
-            <button onclick="setQueryPrompt('Which tracts are furthest from safety-net clinics?')" class="bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 px-2.5 py-1 rounded-md border border-slate-200 text-[11px] transition shadow-2xs">
-              "Furthest from safety-net clinics"
+            <button onclick="setQueryPrompt('Which tracts are furthest from safety-net clinics?')" class="apple-pill bg-white hover:bg-blue-50 text-slate-700 hover:text-[#0071e3] border border-black/5 text-[11px] transition shadow-2xs">
+              "Furthest from safety-net"
             </button>
-            <button onclick="setQueryPrompt('How many FQHC sites are in Fulton County and where are they located?')" class="bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 px-2.5 py-1 rounded-md border border-slate-200 text-[11px] transition shadow-2xs">
-              "FQHC site breakdown"
+            <button onclick="setQueryPrompt('How many FQHC sites are in Fulton County and where are they located?')" class="apple-pill bg-white hover:bg-blue-50 text-slate-700 hover:text-[#0071e3] border border-black/5 text-[11px] transition shadow-2xs">
+              "FQHC breakdown"
             </button>
-            <button onclick="setQueryPrompt('What is the average diabetes and asthma prevalence in high uninsured tracts?')" class="bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 px-2.5 py-1 rounded-md border border-slate-200 text-[11px] transition shadow-2xs">
-              "Chronic disease prevalence"
+            <button onclick="setQueryPrompt('What is the average diabetes and asthma prevalence in high uninsured tracts?')" class="apple-pill bg-white hover:bg-blue-50 text-slate-700 hover:text-[#0071e3] border border-black/5 text-[11px] transition shadow-2xs">
+              "Chronic disease rates"
             </button>
           </div>
 
           <!-- Chat Conversation Log -->
-          <div id="assistantChatLog" class="p-4 space-y-3 max-h-80 overflow-y-auto text-xs bg-slate-50/50">
+          <div id="assistantChatLog" class="p-5 space-y-3 max-h-80 overflow-y-auto text-xs bg-slate-50/30">
             <!-- Welcome message from agent -->
             <div class="flex items-start gap-2.5">
-              <div class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 text-[10px] font-bold">
+              <div class="w-6 h-6 rounded-full bg-[#0071e3] text-white flex items-center justify-center shrink-0 text-[10px] font-bold">
                 AI
               </div>
-              <div class="bg-white p-3 rounded-xl border border-slate-200 text-slate-700 max-w-xl shadow-2xs leading-relaxed">
+              <div class="apple-glass p-3.5 rounded-2xl text-slate-700 max-w-xl leading-relaxed">
                 Hello! I am <strong>My Clinic Assistant</strong>. You can ask me anything about Fulton County census tracts, uninsured rates, vehicle isolation, disease burdens, or clinic accessibility. I query BigQuery live to answer your questions.
               </div>
             </div>
           </div>
 
           <!-- Chat Input Form -->
-          <form id="assistantChatForm" class="p-3 bg-white border-t border-slate-200 flex items-center gap-2">
+          <form id="assistantChatForm" class="p-3 apple-glass-chrome flex items-center gap-2">
             <input 
               type="text" 
               id="assistantQueryInput" 
-              placeholder="Ask My Clinic Assistant (e.g. 'Show tracts with severe transit deserts and high diabetes')..." 
-              class="flex-1 text-xs px-3.5 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-slate-50"
+              placeholder="Ask My Clinic Assistant (e.g. 'Show tracts with severe transit deserts')..." 
+              class="flex-1 text-xs px-4 py-2.5 rounded-full border border-black/10 focus:outline-none focus:ring-2 focus:ring-[#0071e3] bg-white/90 shadow-2xs"
               autocomplete="off"
             />
             <button 
               type="submit" 
               id="assistantSendBtn"
-              class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-lg transition shadow-xs flex items-center gap-1.5 shrink-0"
+              class="px-4 py-2.5 bg-[#0071e3] hover:bg-[#0077ed] text-white font-semibold text-xs rounded-full transition shadow-xs flex items-center gap-1.5 shrink-0 active:scale-95"
             >
               <span>Ask</span>
               <i class="fa-solid fa-paper-plane text-[10px]"></i>
@@ -390,6 +616,118 @@
     </div>
   </main>
 
-  <script src="static/app.js"></script>
+  <!-- Interactive Appointment Booking Modal (Apple Dialog Aesthetic) -->
+  <div id="bookingModal" class="fixed inset-0 modal-backdrop-blur z-50 hidden flex items-center justify-center p-4">
+    <div class="apple-glass rounded-3xl max-w-md w-full shadow-2xl border border-white/60 overflow-hidden transform transition-all p-0">
+      <div class="apple-glass-chrome px-6 py-4.5 flex items-center justify-between">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-xl bg-blue-500/10 text-[#0071e3] flex items-center justify-center">
+            <i class="fa-regular fa-calendar-check text-base"></i>
+          </div>
+          <div>
+            <h3 class="font-semibold text-sm text-slate-900 tracking-tight">Book Clinic Appointment</h3>
+            <p id="bookingModalSubtitle" class="text-xs text-slate-500">Fulton County Mobile Health Van</p>
+          </div>
+        </div>
+        <button id="closeBookingModal" class="w-7 h-7 rounded-full bg-slate-200/60 hover:bg-slate-300 text-slate-500 hover:text-slate-800 flex items-center justify-center text-xs transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="bookingForm" class="p-6 space-y-4 text-xs">
+        <div class="p-3 bg-blue-50/70 rounded-2xl border border-blue-100 text-blue-900">
+          <div class="font-semibold" id="bookingStopTitle">Saturday Clinic Stop</div>
+          <div class="text-[11px] text-blue-700 mt-0.5" id="bookingStopDetails">Tract Centroid, Fulton County, GA</div>
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-700 mb-1">Your Name</label>
+          <input type="text" id="bookingName" required placeholder="Full Name" class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-[#0071e3] focus:border-transparent">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-medium text-slate-700 mb-1">Phone Number (SMS)</label>
+            <input type="tel" id="bookingPhone" placeholder="(404) 555-0199" class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-[#0071e3]">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-700 mb-1">Preferred Time</label>
+            <select id="bookingTime" class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-[#0071e3]">
+              <option>09:30 AM</option>
+              <option>10:15 AM</option>
+              <option>11:00 AM</option>
+              <option>11:45 AM</option>
+              <option>12:30 PM</option>
+              <option>01:15 PM</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-700 mb-1">Service Needed</label>
+          <select id="bookingService" class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-[#0071e3]">
+            <option>Free General Health Checkup</option>
+            <option>Blood Pressure & Hypertension Screening</option>
+            <option>Diabetes & Glucose Testing</option>
+            <option>Prescription Medication Consultation</option>
+            <option>Vaccination / Flu Shot</option>
+          </select>
+        </div>
+
+        <!-- Add to Calendar Links (Google Calendar & iCal) -->
+        <div class="pt-2 border-t border-black/5 flex items-center justify-between">
+          <span class="text-slate-400 text-[11px]">Sync with Calendar:</span>
+          <div class="flex gap-2">
+            <a id="addToGoogleCalBtn" target="_blank" href="#" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[11px] font-semibold flex items-center gap-1 transition">
+              <i class="fa-brands fa-google text-red-500"></i> Google Cal
+            </a>
+            <button type="button" id="downloadIcalBtn" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[11px] font-semibold flex items-center gap-1 transition">
+              <i class="fa-regular fa-calendar text-[#0071e3]"></i> Apple .ICS
+            </button>
+          </div>
+        </div>
+
+        <div id="bookingConfirmation" class="hidden p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-[11px] font-semibold text-center">
+          🎉 Appointment Confirmed! Walk-ins are always welcome.
+        </div>
+
+        <button type="submit" class="w-full py-3 bg-[#0071e3] hover:bg-[#0077ed] text-white font-semibold rounded-xl transition text-xs shadow-xs active:scale-98">
+          Confirm 15-Minute Slot
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- QR Code & Location Modal (Apple Dialog Aesthetic) -->
+  <div id="qrModal" class="fixed inset-0 modal-backdrop-blur z-50 hidden flex items-center justify-center p-4">
+    <div class="apple-glass rounded-3xl max-w-sm w-full shadow-2xl border border-white/60 p-6 text-center">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-slate-900 text-sm tracking-tight" id="qrModalTitle">Location QR Code</h3>
+        <button id="closeQrModal" class="w-7 h-7 rounded-full bg-slate-200/60 hover:bg-slate-300 text-slate-500 hover:text-slate-800 flex items-center justify-center text-xs transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <p class="text-xs text-slate-500 mb-4" id="qrModalSubtitle">Scan with iPhone or Android camera to open turn-by-turn directions in Maps.</p>
+      
+      <div class="p-3.5 bg-white border border-black/5 rounded-2xl inline-block mb-3 shadow-sm">
+        <img id="qrImageDisplay" src="" alt="Location QR Code" class="w-48 h-48 mx-auto rounded-xl shadow-2xs" />
+      </div>
+
+      <div class="text-[11px] text-slate-600 font-mono bg-slate-100/80 p-2.5 rounded-xl mb-4 break-all border border-black/5" id="qrTargetUrl">
+        https://maps.google.com/?q=...
+      </div>
+
+      <div class="flex gap-2">
+        <a id="qrDirectMapsLink" href="#" target="_blank" class="flex-1 py-2.5 bg-[#0071e3] hover:bg-[#0077ed] text-white font-semibold rounded-xl text-xs transition active:scale-98">
+          <i class="fa-solid fa-location-arrow mr-1"></i> Open Maps
+        </a>
+        <button id="qrPrintBtn" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition active:scale-98">
+          <i class="fa-solid fa-print"></i> Print QR
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="static/app.js?v=tooltips_dropdown_v10"></script>
 </body>
 </html>

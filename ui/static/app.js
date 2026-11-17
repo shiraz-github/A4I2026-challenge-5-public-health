@@ -5,16 +5,67 @@ let tractMarkersLayer = L.layerGroup();
 let careSitesLayer = L.layerGroup();
 let clinicStopsLayer = L.layerGroup();
 let rejectedSitesLayer = L.layerGroup();
+let vetoMarkersLayer = L.layerGroup();
 
 let currentStops = [];
 let currentRejectedSites = [];
+let currentVetoStops = [];
+let candidateTractsPool = [];
 let selectedStopIndex = 0;
 
-// Fulton County coordinates (Atlanta Center)
+// Multi-County configuration with centroids, zoom levels, and tract details
+const COUNTY_CONFIG = {
+  "13121": {
+    name: "Fulton County, GA",
+    label: "Fulton County, GA (Atlanta)",
+    center: [33.7490, -84.3880],
+    zoom: 10,
+    subtitle: "Dynamic Public Health Equity & Preventative Mobile Care Siting • Fulton County, GA (Atlanta)"
+  },
+  "17031": {
+    name: "Cook County, IL",
+    label: "Cook County, IL (Chicago)",
+    center: [41.8781, -87.6298],
+    zoom: 10,
+    subtitle: "Dynamic Public Health Equity & Preventative Mobile Care Siting • Cook County, IL (Chicago)"
+  },
+  "06085": {
+    name: "Santa Clara County, CA",
+    label: "Santa Clara County, CA (Sunnyvale / San Jose)",
+    center: [37.3541, -121.9552],
+    zoom: 10,
+    subtitle: "Dynamic Public Health Equity & Preventative Mobile Care Siting • Santa Clara County, CA (Sunnyvale / San Jose)"
+  },
+  "36005": {
+    name: "Bronx County, NY",
+    label: "Bronx County, NY (New York City)",
+    center: [40.8448, -73.8648],
+    zoom: 11,
+    subtitle: "Dynamic Public Health Equity & Preventative Mobile Care Siting • Bronx County, NY (New York City)"
+  },
+  "48201": {
+    name: "Harris County, TX",
+    label: "Harris County, TX (Houston)",
+    center: [29.7604, -95.3698],
+    zoom: 10,
+    subtitle: "Dynamic Public Health Equity & Preventative Mobile Care Siting • Harris County, TX (Houston)"
+  },
+  "48453": {
+    name: "Travis County, TX",
+    label: "Travis County, TX (Austin)",
+    center: [30.2672, -97.7431],
+    zoom: 10,
+    subtitle: "Dynamic Public Health Equity & Preventative Mobile Care Siting • Travis County, TX (Austin)"
+  }
+};
+
+let currentCounty = "13121";
 const FULTON_CENTER = [33.7490, -84.3880];
 
 let currentYear = 2026;
 let currentMonth = 11; // 1-indexed (November = 11)
+let planCycle = 0;
+let currentWeather = "clear"; // 'clear' or 'rain'
 
 document.addEventListener("DOMContentLoaded", () => {
   initMap();
@@ -23,9 +74,58 @@ document.addEventListener("DOMContentLoaded", () => {
   loadTracts();
   loadCareSites();
 
+  // County Selector Handler
+  const countySelect = document.getElementById("countySelect");
+  if (countySelect) {
+    countySelect.value = currentCounty;
+    countySelect.addEventListener("change", (e) => {
+      currentCounty = e.target.value;
+      planCycle = 0; // reset rotation cycle on county change
+      
+      const config = COUNTY_CONFIG[currentCounty] || COUNTY_CONFIG["13121"];
+      
+      // Update subheader text and map title
+      const subheader = document.getElementById("countySubheader");
+      if (subheader) subheader.innerText = config.subtitle;
+      
+      const mapTitle = document.getElementById("mapCountyTitle");
+      if (mapTitle) mapTitle.innerText = config.label;
+
+      // Center map smoothly on the selected county
+      if (map) {
+        map.flyTo(config.center, config.zoom, { animate: true, duration: 1.2 });
+      }
+
+      // Reload county datasets
+      loadPlan();
+      loadTracts();
+      loadCareSites();
+    });
+  }
+
   document.getElementById("refreshPlanBtn").addEventListener("click", () => {
+    planCycle += 1;
     loadPlan();
   });
+
+  // Weather Adaptive Toggle Listeners
+  const clearBtn = document.getElementById("weatherClearBtn");
+  const rainBtn = document.getElementById("weatherRainBtn");
+
+  function setWeatherMode(mode) {
+    currentWeather = mode;
+    if (mode === "rain") {
+      rainBtn.className = "px-2.5 py-1 rounded-lg font-semibold text-white bg-blue-600 shadow-2xs transition flex items-center gap-1 active:scale-95 text-[11px]";
+      clearBtn.className = "px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition flex items-center gap-1 active:scale-95 text-[11px]";
+    } else {
+      clearBtn.className = "px-2.5 py-1 rounded-lg font-semibold text-[#0071e3] bg-white shadow-2xs transition flex items-center gap-1 active:scale-95 text-[11px]";
+      rainBtn.className = "px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition flex items-center gap-1 active:scale-95 text-[11px]";
+    }
+    loadPlan();
+  }
+
+  if (clearBtn) clearBtn.addEventListener("click", () => setWeatherMode("clear"));
+  if (rainBtn) rainBtn.addEventListener("click", () => setWeatherMode("rain"));
 
   const monthSelect = document.getElementById("monthSelect");
   if (monthSelect) {
@@ -90,6 +190,17 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  const toggleVetoPins = document.getElementById("toggleVetoPins");
+  if (toggleVetoPins) {
+    toggleVetoPins.addEventListener("change", (e) => {
+      if (e.target.checked) {
+        map.addLayer(vetoMarkersLayer);
+      } else {
+        map.removeLayer(vetoMarkersLayer);
+      }
+    });
+  }
+
   // 3-Agent Collaborative Pipeline Runner
   const runPipelineBtn = document.getElementById("runPipelineBtn");
   if (runPipelineBtn) {
@@ -98,24 +209,70 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  const flierEnBtn = document.getElementById("showFlierEnBtn");
-  const flierEsBtn = document.getElementById("showFlierEsBtn");
-  if (flierEnBtn && flierEsBtn) {
-    flierEnBtn.addEventListener("click", () => {
-      flierEnBtn.className = "bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] font-semibold";
-      flierEsBtn.className = "bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-[10px] font-semibold";
-      if (window.latestFlyers) {
-        document.getElementById("flierContentBox").innerText = window.latestFlyers.flier_en || "";
-      }
-    });
-    flierEsBtn.addEventListener("click", () => {
-      flierEsBtn.className = "bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] font-semibold";
-      flierEnBtn.className = "bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-[10px] font-semibold";
-      if (window.latestFlyers) {
-        document.getElementById("flierContentBox").innerText = window.latestFlyers.flier_es || "";
+  // Dedicated Main Flyer Language Switchers
+  const mainEn = document.getElementById("mainFlierEnBtn");
+  const mainEs = document.getElementById("mainFlierEsBtn");
+  const mainVi = document.getElementById("mainFlierViBtn");
+  if (mainEn) mainEn.addEventListener("click", () => updateFlyerDisplay("en"));
+  if (mainEs) mainEs.addEventListener("click", () => updateFlyerDisplay("es"));
+  if (mainVi) mainVi.addEventListener("click", () => updateFlyerDisplay("vi"));
+
+  // Copy & Print Flyer Handlers
+  const copyBtn = document.getElementById("copyFlierBtn");
+  if (copyBtn) {
+    copyBtn.addEventListener("click", () => {
+      const box = document.getElementById("mainFlierContentBox");
+      if (box && navigator.clipboard) {
+        navigator.clipboard.writeText(box.innerText).then(() => {
+          copyBtn.innerHTML = `<i class="fa-solid fa-check text-[10px] text-emerald-600"></i> Copied!`;
+          setTimeout(() => {
+            copyBtn.innerHTML = `<i class="fa-regular fa-copy text-[10px]"></i> Copy Text`;
+          }, 2000);
+        });
       }
     });
   }
+
+  const printBtn = document.getElementById("printFlierBtn");
+  if (printBtn) {
+    printBtn.addEventListener("click", () => {
+      const box = document.getElementById("mainFlierContentBox");
+      if (!box) return;
+      const printWindow = window.open("", "_blank");
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Community Health Clinic Flyer</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 40px; color: #1e293b; line-height: 1.6; }
+              h1 { color: #0071e3; font-size: 24px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
+              h3 { color: #334155; font-size: 16px; margin-top: 20px; }
+              ul { padding-left: 20px; }
+              li { margin-bottom: 6px; }
+              .footer { margin-top: 30px; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 12px; }
+            </style>
+          </head>
+          <body>
+            <div>${box.innerText.replace(/\n/g, '<br>')}</div>
+            <div class="footer">Fulton County Mobile Health Van • Public Health Equity Outreach</div>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
+    });
+  }
+
+  // Pipeline panel flyer tab switchers
+  const flierEnBtn = document.getElementById("showFlierEnBtn");
+  const flierEsBtn = document.getElementById("showFlierEsBtn");
+  const flierViBtn = document.getElementById("showFlierViBtn");
+  if (flierEnBtn) flierEnBtn.addEventListener("click", () => updateFlyerDisplay("en"));
+  if (flierEsBtn) flierEsBtn.addEventListener("click", () => updateFlyerDisplay("es"));
+  if (flierViBtn) flierViBtn.addEventListener("click", () => updateFlyerDisplay("vi"));
+
+  // Modals Listeners
+  initModalListeners();
 });
 
 function syncMonthSelectAndLoad() {
@@ -141,11 +298,31 @@ function initMap() {
     zoomControl: true
   });
 
-  // OpenStreetMap base layer
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 18,
-    attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
+  // Google Maps base layer (Roads / Standard vector view)
+  const googleRoads = L.tileLayer("https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", {
+    subdomains: ["0", "1", "2", "3"],
+    maxZoom: 20,
+    attribution: 'Map data &copy; <a href="https://maps.google.com" target="_blank" rel="noopener">Google Maps</a>'
   }).addTo(map);
+
+  // Google Maps Satellite & Hybrid view for optional layer toggle
+  const googleHybrid = L.tileLayer("https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}", {
+    subdomains: ["0", "1", "2", "3"],
+    maxZoom: 20,
+    attribution: 'Imagery &copy; <a href="https://maps.google.com" target="_blank" rel="noopener">Google Maps</a>'
+  });
+
+  const googleTerrain = L.tileLayer("https://mt{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}", {
+    subdomains: ["0", "1", "2", "3"],
+    maxZoom: 20,
+    attribution: 'Map data &copy; <a href="https://maps.google.com" target="_blank" rel="noopener">Google Maps</a>'
+  });
+
+  L.control.layers({
+    "Google Maps (Standard)": googleRoads,
+    "Google Maps (Satellite / Hybrid)": googleHybrid,
+    "Google Maps (Terrain)": googleTerrain
+  }, null, { position: "topright", collapsed: true }).addTo(map);
 
   map.addLayer(tractMarkersLayer);
   map.addLayer(careSitesLayer);
@@ -205,9 +382,11 @@ function initCalendar(year, month, stops = []) {
 async function loadPlan() {
   try {
     const monthKey = `${currentYear}-${String(currentMonth).padStart(2, "0")}`;
-    const res = await fetch(`api/plan?month=${monthKey}`);
+    const res = await fetch(`api/plan?month=${monthKey}&cycle=${planCycle}&weather=${currentWeather}&county=${currentCounty}`);
     const data = await res.json();
     currentStops = data.stops || [];
+    currentVetoStops = data.round1_veto_stops || [];
+    candidateTractsPool = data.candidate_tracts || [];
 
     // Rebuild calendar with month's actual days and stops
     initCalendar(data.year || currentYear, data.month_num || currentMonth, currentStops);
@@ -216,6 +395,10 @@ async function loadPlan() {
     renderClinicStopPins(currentStops);
     renderAlternatives(data.alternatives || []);
     renderRejectedSites(data.rejected_sites || []);
+    if (data.flyers) {
+      window.latestFlyers = data.flyers;
+      updateFlyerDisplay("en");
+    }
 
     if (currentStops.length > 0) {
       selectStop(0);
@@ -225,6 +408,38 @@ async function loadPlan() {
   }
 }
 
+function updateFlyerDisplay(lang = "en") {
+  const flyers = window.latestFlyers || {};
+  let content = "";
+  if (lang === "en") content = flyers.flier_en || "English flyer not available.";
+  else if (lang === "es") content = flyers.flier_es || "Folleto en español no disponible.";
+  else if (lang === "vi") content = flyers.flier_vi || "Tờ rơi tiếng Việt chưa có sẵn.";
+
+  // Update main dedicated flyer card
+  const mainBox = document.getElementById("mainFlierContentBox");
+  if (mainBox) mainBox.innerText = content;
+
+  // Update pipeline flyer card if present
+  const pipeBox = document.getElementById("flierContentBox");
+  if (pipeBox) pipeBox.innerText = content;
+
+  // Update tab button styles
+  const mainBtns = {
+    en: document.getElementById("mainFlierEnBtn"),
+    es: document.getElementById("mainFlierEsBtn"),
+    vi: document.getElementById("mainFlierViBtn")
+  };
+
+  Object.entries(mainBtns).forEach(([k, btn]) => {
+    if (!btn) return;
+    if (k === lang) {
+      btn.className = "bg-[#0071e3] text-white px-2.5 py-1 rounded-lg text-[11px] font-semibold transition shadow-2xs";
+    } else {
+      btn.className = "text-slate-600 hover:text-slate-900 px-2.5 py-1 rounded-lg text-[11px] font-medium transition";
+    }
+  });
+}
+
 function renderStopsList(stops) {
   const container = document.getElementById("stopsList");
   container.innerHTML = "";
@@ -232,57 +447,216 @@ function renderStopsList(stops) {
   stops.forEach((stop, idx) => {
     const card = document.createElement("div");
     card.id = `stop-card-${idx}`;
-    card.className = `p-3.5 rounded-lg border border-slate-200 cursor-pointer transition hover:border-blue-400 bg-white shadow-xs`;
+    card.className = `p-4 rounded-2xl border border-black/5 cursor-pointer transition-all bg-white/90 hover:bg-white hover:shadow-md hover:border-[#0071e3]/30 active:scale-[0.99]`;
     card.addEventListener("click", () => selectStop(idx));
 
     // Construct comparative reasoning badges
     const uninsBadge = stop.uninsured_mult > 1.5 
-      ? `<span class="bg-red-50 text-red-700 text-[10px] font-semibold px-1.5 py-0.5 rounded border border-red-200">${stop.uninsured_mult}x Co. Avg</span>`
+      ? `<span class="apple-pill bg-red-500/10 text-[#ff3b30] border border-red-500/20 text-[10px]">${stop.uninsured_mult}x Co. Avg</span>`
       : "";
     const vehBadge = stop.vehicle_mult > 1.5 
-      ? `<span class="bg-amber-50 text-amber-700 text-[10px] font-semibold px-1.5 py-0.5 rounded border border-amber-200">${stop.vehicle_mult}x Co. Avg</span>`
+      ? `<span class="apple-pill bg-amber-500/10 text-amber-700 border border-amber-500/20 text-[10px]">${stop.vehicle_mult}x Co. Avg</span>`
       : "";
 
+    // Build dropdown options from candidateTractsPool
+    let dropdownOptionsHtml = "";
+    if (candidateTractsPool && candidateTractsPool.length > 0) {
+      dropdownOptionsHtml = candidateTractsPool.map(t => {
+        const isSelected = String(t.geo_id) === String(stop.tract_id) ? "selected" : "";
+        return `<option value="${t.geo_id}" ${isSelected}>Rank #${t.rank_overall} (Tract ${t.geo_id} • Score ${t.composite_need_score} • Uninsured ${t.pct_uninsured}%)</option>`;
+      }).join("");
+    } else {
+      dropdownOptionsHtml = `<option value="${stop.tract_id}" selected>Rank #${stop.rank_overall} (Tract ${stop.tract_id})</option>`;
+    }
+
     card.innerHTML = `
-      <div class="flex items-center justify-between mb-1.5">
-        <div class="flex items-center gap-1.5">
-          <span class="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span class="apple-pill bg-purple-600 text-white font-bold text-xs shadow-xs px-2.5 py-1">
+            <i class="fa-solid fa-trophy text-[10px] text-amber-300 mr-1"></i> Rank #${stop.rank_overall}
+          </span>
+          <span class="apple-pill bg-blue-500/10 text-blue-700 border border-blue-500/20 font-semibold text-xs">
             ${stop.saturday_label}
           </span>
-          <span class="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
-            Rank #${stop.rank_overall} (Top ${100 - stop.need_percentile}%)
+          <span class="apple-pill bg-slate-100 text-slate-600 text-[10px]">
+            Score ${stop.composite_need_score}
           </span>
         </div>
         <span class="text-xs font-semibold text-slate-500 font-mono">Tract ${stop.tract_id}</span>
       </div>
 
+      <!-- Interactive Location Dropdown Selector -->
+      <div class="mb-2.5 p-2 bg-slate-50/90 rounded-xl border border-black/5 flex items-center gap-2">
+        <label class="text-[10px] font-semibold text-slate-500 uppercase tracking-tight flex items-center gap-1 whitespace-nowrap">
+          <i class="fa-solid fa-location-dot text-[#0071e3]"></i> Change Site:
+        </label>
+        <select class="location-select flex-1 text-[11px] font-medium text-slate-800 bg-white border border-slate-200 rounded-lg px-2 py-1 shadow-2xs focus:ring-1 focus:ring-[#0071e3] focus:border-[#0071e3] cursor-pointer" data-stop-idx="${idx}">
+          ${dropdownOptionsHtml}
+        </select>
+      </div>
+
+      <!-- Weather-Adaptive Facility & Parking Type -->
+      <div class="mb-2 p-2 rounded-xl border ${stop.weather_mode === 'rain' ? 'bg-blue-50/80 border-blue-200/60 text-blue-900' : 'bg-amber-50/60 border-amber-200/60 text-amber-900'} flex items-center justify-between text-[11px]">
+        <div class="flex items-center gap-1.5">
+          <i class="fa-solid ${stop.parking_icon || (stop.weather_mode === 'rain' ? 'fa-warehouse' : 'fa-square-parking')} ${stop.weather_mode === 'rain' ? 'text-blue-600' : 'text-amber-600'}"></i>
+          <span class="font-semibold">${stop.parking_type || 'Civic Staging Facility'}</span>
+        </div>
+        <span class="text-[10px] font-medium px-2 py-0.5 rounded-full ${stop.weather_mode === 'rain' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-800'}">
+          ${stop.weather_mode === 'rain' ? '🌧️ Covered Deck' : '☀️ Open Plaza'}
+        </span>
+      </div>
+
       <!-- Why Selected Explanation -->
-      <p class="text-xs text-slate-700 font-medium mb-1.5 leading-snug">
+      <p class="text-xs text-slate-700 font-medium mb-2 leading-relaxed">
         ${stop.why_chosen}
       </p>
 
       <!-- Key Comparative Metric Indicators -->
-      <div class="grid grid-cols-3 gap-1.5 mt-2 text-center text-[11px] bg-slate-50 p-2 rounded border border-slate-100">
+      <div class="grid grid-cols-3 gap-2 mt-2 text-center text-[11px] bg-slate-50/80 p-2.5 rounded-xl border border-black/5">
         <div>
-          <span class="text-slate-400 block text-[9px] uppercase">Uninsured</span>
-          <span class="font-bold text-red-600">${stop.pct_uninsured}%</span>
-          ${uninsBadge}
+          <span class="text-slate-400 block text-[9px] uppercase tracking-tight">Uninsured</span>
+          <span class="font-semibold text-[#ff3b30]">${stop.pct_uninsured}%</span>
+          <div class="mt-0.5">${uninsBadge}</div>
         </div>
         <div>
-          <span class="text-slate-400 block text-[9px] uppercase">No Car</span>
-          <span class="font-bold text-amber-600">${stop.pct_no_vehicle}%</span>
-          ${vehBadge}
+          <span class="text-slate-400 block text-[9px] uppercase tracking-tight">No Car</span>
+          <span class="font-semibold text-amber-600">${stop.pct_no_vehicle}%</span>
+          <div class="mt-0.5">${vehBadge}</div>
         </div>
         <div>
-          <span class="text-slate-400 block text-[9px] uppercase">Safety Net</span>
-          <span class="font-bold text-blue-600">${stop.km_to_safety_net} km</span>
-          <span class="text-[10px] text-slate-500 block">${stop.dist_diff > 0 ? '+' : ''}${stop.dist_diff} km vs avg</span>
+          <span class="text-slate-400 block text-[9px] uppercase tracking-tight">Safety Net</span>
+          <span class="font-semibold text-[#0071e3]">${stop.km_to_safety_net} km</span>
+          <span class="text-[10px] text-slate-500 block mt-0.5">${stop.dist_diff > 0 ? '+' : ''}${stop.dist_diff} km vs avg</span>
         </div>
+      </div>
+
+      <!-- Quick Action Buttons: Book Calendar, Location QR & Flyer -->
+      <div class="mt-3 flex items-center gap-1.5 pt-2.5 border-t border-black/5">
+        <button type="button" class="book-slot-btn flex-1 py-1.5 px-2.5 bg-blue-500/10 hover:bg-blue-500/20 text-[#0071e3] font-semibold rounded-xl text-[11px] transition flex items-center justify-center gap-1 border border-blue-500/20 active:scale-95" data-idx="${idx}">
+          <i class="fa-regular fa-calendar-check text-[10px]"></i> Book
+        </button>
+        <button type="button" class="view-qr-btn flex-1 py-1.5 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-[11px] transition flex items-center justify-center gap-1 border border-black/5 active:scale-95" data-idx="${idx}">
+          <i class="fa-solid fa-qrcode text-[10px]"></i> QR Code
+        </button>
+        <button type="button" class="view-flyer-btn flex-1 py-1.5 px-2.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 font-semibold rounded-xl text-[11px] transition flex items-center justify-center gap-1 border border-purple-500/20 active:scale-95" data-idx="${idx}">
+          <i class="fa-solid fa-bullhorn text-[10px]"></i> Flyer
+        </button>
       </div>
     `;
 
+    // Hook quick button handlers
+    const bookBtn = card.querySelector(".book-slot-btn");
+    const qrBtn = card.querySelector(".view-qr-btn");
+    const flyerBtn = card.querySelector(".view-flyer-btn");
+
+    if (bookBtn) {
+      bookBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openBookingModal(stop);
+      });
+    }
+
+    if (qrBtn) {
+      qrBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openQrModal(stop);
+      });
+    }
+
+    if (flyerBtn) {
+      flyerBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const flyerCard = document.getElementById("mainFlierContentBox");
+        if (flyerCard) {
+          flyerCard.scrollIntoView({ behavior: "smooth", block: "center" });
+          flyerCard.classList.add("ring-2", "ring-purple-500");
+          setTimeout(() => flyerCard.classList.remove("ring-2", "ring-purple-500"), 1800);
+        }
+      });
+    }
+
+    // Hook dropdown change handler
+    const locSelect = card.querySelector(".location-select");
+    if (locSelect) {
+      locSelect.addEventListener("click", (e) => e.stopPropagation());
+      locSelect.addEventListener("change", (e) => {
+        e.stopPropagation();
+        changeStopLocation(idx, e.target.value);
+      });
+    }
+
     container.appendChild(card);
   });
+}
+
+function changeStopLocation(stopIndex, newTractId) {
+  if (!currentStops[stopIndex] || !candidateTractsPool.length) return;
+  const newTract = candidateTractsPool.find(t => String(t.geo_id) === String(newTractId));
+  if (!newTract) return;
+
+  const oldStop = currentStops[stopIndex];
+  const avgUninsured = 11.0;
+  const avgNoVehicle = 11.7;
+  const avgKmCare = 6.78;
+
+  const uninsMult = avgUninsured ? Number((newTract.pct_uninsured / avgUninsured).toFixed(1)) : 1.0;
+  const vehMult = avgNoVehicle ? Number((newTract.pct_no_vehicle / avgNoVehicle).toFixed(1)) : 1.0;
+  const distDiff = Number((newTract.km_to_safety_net - avgKmCare).toFixed(1));
+
+  // Update current stop object in place
+  currentStops[stopIndex] = {
+    ...oldStop,
+    tract_id: newTract.geo_id,
+    total_pop: newTract.total_pop,
+    lat: newTract.latitude,
+    lon: newTract.longitude,
+    rank_overall: newTract.rank_overall,
+    total_tracts: newTract.total_tracts || 326,
+    need_percentile: newTract.need_percentile,
+    composite_need_score: newTract.composite_need_score,
+    pct_uninsured: newTract.pct_uninsured,
+    pct_no_vehicle: newTract.pct_no_vehicle,
+    km_to_safety_net: newTract.km_to_safety_net,
+    extra_km_if_uninsured: newTract.extra_km_if_uninsured,
+    pct_diabetes: newTract.pct_diabetes,
+    pct_asthma: newTract.pct_asthma,
+    uninsured_mult: uninsMult,
+    vehicle_mult: vehMult,
+    dist_diff: distDiff,
+    parking_type: currentStops[stopIndex].parking_type || (currentWeather === 'rain' ? 'Indoor Covered Parking Deck' : 'Outdoor Open Civic Plaza'),
+    facility_name: `Tract ${newTract.geo_id} ${currentWeather === 'rain' ? 'Covered Civic Deck & Indoor Community Bay' : 'Civic Plaza & Community Center Lot'}`,
+    parking_icon: currentWeather === 'rain' ? 'fa-warehouse' : 'fa-square-parking',
+    weather_mode: currentWeather,
+    weather_badge: currentWeather === 'rain' ? 'Rain Contingency: Indoor Parking' : 'Fair Weather: Open Plaza',
+    weather_note: currentWeather === 'rain' ? '🌧️ Rainy Weather Mode Active: Selected indoor multi-level covered deck to ensure dry patient waiting and van ramp protection.' : '☀️ Clear Weather Mode: Open civic plaza staging with pedestrian walk-up access.',
+    rationale: `High uninsured (${newTract.pct_uninsured}%) and vehicle isolation (${newTract.pct_no_vehicle}% without car) with ${newTract.km_to_safety_net} km distance to nearest safety net care. Facility: ${currentWeather === 'rain' ? 'Indoor Covered Parking Deck' : 'Outdoor Open Civic Plaza'}.`,
+    reasoning_bullets: [
+      `Need Score: ${newTract.composite_need_score} (Rank #${newTract.rank_overall} of ${newTract.total_tracts || 326} county tracts).`,
+      `Uninsured Rate: ${newTract.pct_uninsured}% (${uninsMult}x higher than county avg of ${avgUninsured}%).`,
+      `Transit/Vehicle Isolation: ${newTract.pct_no_vehicle}% of households have no vehicle (${vehMult}x county avg of ${avgNoVehicle}%).`,
+      `Safety-Net Care Gap: ${newTract.km_to_safety_net} km to nearest FQHC/safety-net provider (${distDiff > 0 ? '+' : ''}${distDiff} km vs avg).`,
+      currentWeather === 'rain' ? '🌧️ Rainy Weather Mode Active: Selected indoor multi-level covered deck to ensure dry patient waiting and van ramp protection.' : '☀️ Clear Weather Mode: Open civic plaza staging with pedestrian walk-up access.'
+    ],
+    why_chosen: `Rank #${newTract.rank_overall} Priority Site (Custom selected via dropdown). Sited due to ${newTract.pct_uninsured}% uninsured rate and ${newTract.pct_no_vehicle}% vehicle isolation.`
+  };
+
+  // Re-render stop list and map pins
+  renderStopsList(currentStops);
+  renderClinicStopPins(currentStops);
+  selectStop(stopIndex);
+
+  // Update Trilingual Flyers with updated stops
+  updateFlyersFromCurrentStops();
+}
+
+function updateFlyersFromCurrentStops() {
+  if (currentStops.length < 4) return;
+  window.latestFlyers = {
+    flier_en: `# 🏥 Free Mobile Health Clinic Coming to Your Neighborhood!\n\n**No insurance? No problem! No ID required. Walk-ins are always welcome.**\n\n### Free Health Services:\n- Blood pressure checks & heart health screening\n- Diabetes & blood sugar rapid testing\n- Doctor consultations & preventive care checkups\n- Medication guidance & health insurance navigation\n\n### 4 Saturday Clinic Stops (9:00 AM – 2:00 PM):\n- **${currentStops[0].saturday_label} (${currentStops[0].date})**: Census Tract ${currentStops[0].tract_id} (Rank #${currentStops[0].rank_overall} Priority)\n- **${currentStops[1].saturday_label} (${currentStops[1].date})**: Census Tract ${currentStops[1].tract_id} (Rank #${currentStops[1].rank_overall} Priority)\n- **${currentStops[2].saturday_label} (${currentStops[2].date})**: Census Tract ${currentStops[2].tract_id} (Rank #${currentStops[2].rank_overall} Priority)\n- **${currentStops[3].saturday_label} (${currentStops[3].date})**: Census Tract ${currentStops[3].tract_id} (Rank #${currentStops[3].rank_overall} Priority)\n\n📅 *Click "Book" to add to your calendar, or scan the Location QR code for directions!*`,
+    flier_es: `# 🏥 ¡Clínica Médica Móvil Gratuita en su Comunidad!\n\n**¿No tiene seguro médico? ¡No se preocupe! No se requiere identificación. ¡Todos son bienvenidos!**\n\n### Servicios Gratuitos:\n- Control de presión arterial y chequeo del corazón\n- Pruebas rápidas de glucosa y diabetes\n- Consultas con médicos amigables y chequeos preventivos\n- Asesoramiento de salud e información comunitaria\n\n### Horario de los 4 Sábados (9:00 AM – 2:00 PM):\n- **${currentStops[0].saturday_label} (${currentStops[0].date})**: Sector Censal ${currentStops[0].tract_id} (Prioridad #${currentStops[0].rank_overall})\n- **${currentStops[1].saturday_label} (${currentStops[1].date})**: Sector Censal ${currentStops[1].tract_id} (Prioridad #${currentStops[1].rank_overall})\n- **${currentStops[2].saturday_label} (${currentStops[2].date})**: Sector Censal ${currentStops[2].tract_id} (Prioridad #${currentStops[2].rank_overall})\n- **${currentStops[3].saturday_label} (${currentStops[3].date})**: Sector Censal ${currentStops[3].tract_id} (Prioridad #${currentStops[3].rank_overall})\n\n📅 *¡Haga clic en "Reservar Cita" para guardarlo en su calendario o escanee el código QR para indicaciones!*`,
+    flier_vi: `# 🏥 Phòng Khám Y Tế Di Động Miễn Phí Tại Khu Vực Của Quý Vị!\n\n**Không có bảo hiểm? Không sao! Không cần giấy tờ tùy thân. Chào đón tất cả mọi người!**\n\n### Dịch Vụ Khám Chữa Bệnh Miễn Phí:\n- Đo huyết áp và kiểm tra sức khỏe tim mạch\n- Xét nghiệm đường huyết và tầm soát bệnh tiểu đường\n- Tư vấn bác sĩ tận tình và khám sức khỏe tổng quát phòng ngừa\n- Hướng dẫn dùng thuốc và hỗ trợ tiếp cận y tế cộng đồng\n\n### Lịch Khám 4 Ngày Thứ Bảy (9:00 Sáng – 2:00 Chiều):\n- **${currentStops[0].saturday_label} (${currentStops[0].date})**: Khu Dân Cư ${currentStops[0].tract_id} (Ưu Tiên Hạng #${currentStops[0].rank_overall})\n- **${currentStops[1].saturday_label} (${currentStops[1].date})**: Khu Dân Cư ${currentStops[1].tract_id} (Ưu Tiên Hạng #${currentStops[1].rank_overall})\n- **${currentStops[2].saturday_label} (${currentStops[2].date})**: Khu Dân Cư ${currentStops[2].tract_id} (Ưu Tiên Hạng #${currentStops[2].rank_overall})\n- **${currentStops[3].saturday_label} (${currentStops[3].date})**: Khu Dân Cư ${currentStops[3].tract_id} (Ưu Tiên Hạng #${currentStops[3].rank_overall})\n\n📅 *Nhấp vào "Đặt Lịch" để thêm vào lịch hoặc quét mã QR để nhận chỉ đường!*`
+  };
+  updateFlyerDisplay("en");
 }
 
 function renderAlternatives(alternatives) {
@@ -368,19 +742,34 @@ function renderRejectedSites(rejectedSites) {
     });
 
     const marker = L.marker([rej.lat, rej.lon], { icon: icon }).addTo(rejectedSitesLayer);
+    
+    // Hover Tooltip: Matches dropdown option format with conflict indicator:
+    // "Rank #<rank> (Tract <tract_id> • Score <score> • Uninsured <pct>%)"
+    marker.bindTooltip(`
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; font-size: 11px; padding: 3px 6px; font-weight: 600; color: #be123c; line-height: 1.3;">
+        <span>⚠️ Rejected Site:</span><br>
+        <strong>Rank #${rej.rank_overall}</strong> (Tract ${rej.tract_id} • Score ${rej.composite_need_score} • Uninsured ${rej.pct_uninsured}%)<br>
+        <span style="font-weight: 400; color: #475569; font-size: 10px;">Conflict: ${rej.event_name}</span>
+      </div>
+    `, { sticky: true, direction: "top" });
+
     marker.bindPopup(`
-      <div style="font-family: sans-serif; font-size: 12px; line-height: 1.4; max-width: 260px;">
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; font-size: 12px; line-height: 1.45; max-width: 260px;">
         <div style="color: #be123c; font-weight: bold; font-size: 13px; display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
           ⚠️ REJECTED CANDIDATE SPOT
         </div>
-        <strong>Tract:</strong> ${rej.tract_id} (Rank #${rej.rank_overall}, Score ${rej.composite_need_score})<br>
-        <strong>Uninsured:</strong> ${rej.pct_uninsured}% | <strong>No Car:</strong> ${rej.pct_no_vehicle}%<br>
-        <hr style="margin: 5px 0; border: none; border-top: 1px solid #fecdd3;">
-        <strong style="color: #9f1239;">Local Event Conflict:</strong><br>
-        <span style="font-weight: 600; color: #1e293b;">${rej.event_name}</span> (${rej.venue_zone})<br>
-        <p style="margin-top: 4px; font-size: 11px; color: #475569; background: #fff1f2; padding: 5px; border-radius: 4px; border: 1px solid #ffe4e6;">
-          ${rej.rejection_reason}
-        </p>
+        <div style="margin: 4px 0; font-size: 11px; background: #fff1f2; padding: 5px 8px; border-radius: 8px; border: 1px solid #fecdd3; color: #be123c; font-weight: 600;">
+          Rank #${rej.rank_overall} (Tract ${rej.tract_id} • Score ${rej.composite_need_score} • Uninsured ${rej.pct_uninsured}%)
+        </div>
+        <div style="font-size: 11px; color: #334155; margin-top: 4px;">
+          <strong>Uninsured:</strong> ${rej.pct_uninsured}% | <strong>No Car:</strong> ${rej.pct_no_vehicle}%<br>
+          <hr style="margin: 5px 0; border: none; border-top: 1px solid #fecdd3;">
+          <strong style="color: #9f1239;">Local Event Conflict:</strong><br>
+          <span style="font-weight: 600; color: #1e293b;">${rej.event_name}</span> (${rej.venue_zone})<br>
+          <p style="margin-top: 4px; font-size: 11px; color: #475569; background: #fff1f2; padding: 5px; border-radius: 4px; border: 1px solid #ffe4e6;">
+            ${rej.rejection_reason}
+          </p>
+        </div>
       </div>
     `);
   });
@@ -404,16 +793,35 @@ function renderClinicStopPins(stops) {
 
     const marker = L.marker([stop.lat, stop.lon], { icon: icon }).addTo(clinicStopsLayer);
     marker.on("click", () => selectStop(idx));
+
+    // Hover Tooltip: Matches dropdown option format exactly:
+    // "Rank #<rank> (Tract <tract_id> • Score <score> • Uninsured <pct>%)"
+    const dropdownLabel = `Stop #${idx + 1} (${stop.saturday_label}): Rank #${stop.rank_overall} (Tract ${stop.tract_id} • Score ${stop.composite_need_score} • Uninsured ${stop.pct_uninsured}%)`;
+    marker.bindTooltip(`
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; font-size: 11px; padding: 3px 6px; font-weight: 600; color: #1e3a8a; line-height: 1.3;">
+        <span style="color: #2563eb;">Stop #${idx + 1} (${stop.saturday_label}):</span><br>
+        <strong>Rank #${stop.rank_overall}</strong> (Tract ${stop.tract_id} • Score ${stop.composite_need_score} • Uninsured ${stop.pct_uninsured}%)
+      </div>
+    `, { sticky: true, direction: "top" });
+
+    const countyLabel = (COUNTY_CONFIG[currentCounty] || {}).name || "Selected County";
     marker.bindPopup(`
-      <div style="font-family: sans-serif; font-size: 12px; line-height: 1.4; max-width: 240px;">
-        <strong style="color: #1e40af;">${stop.saturday_label} (Stop #${idx + 1})</strong><br>
-        <div style="margin: 4px 0; font-size: 11px; background: #eff6ff; padding: 4px 6px; border-radius: 4px;">
-          <strong>Rank #${stop.rank_overall}</strong> in Fulton County (Score: ${stop.composite_need_score})
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; font-size: 12px; line-height: 1.45; max-width: 260px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+          <strong style="color: #1e40af; font-size: 13px;">${stop.saturday_label}</strong>
+          <span style="background: #2563eb; color: white; padding: 2px 7px; border-radius: 9999px; font-size: 10px; font-weight: 700;">Stop #${idx + 1}</span>
         </div>
-        <strong>Pop:</strong> ${stop.total_pop.toLocaleString()}<br>
-        <strong>Uninsured:</strong> ${stop.pct_uninsured}% (${stop.uninsured_mult}x county avg)<br>
-        <strong>Lacks Vehicle:</strong> ${stop.pct_no_vehicle}% (${stop.vehicle_mult}x county avg)<br>
-        <strong>Safety-Net Distance:</strong> ${stop.km_to_safety_net} km
+        <div style="margin: 4px 0; font-size: 11px; background: #eff6ff; padding: 5px 8px; border-radius: 8px; border: 1px solid #bfdbfe; color: #1e40af; font-weight: 600;">
+          Rank #${stop.rank_overall} (Tract ${stop.tract_id} • Score ${stop.composite_need_score} • Uninsured ${stop.pct_uninsured}%)
+        </div>
+        <div style="font-size: 11px; color: #334155; margin-top: 4px;">
+          <strong>County:</strong> ${countyLabel}<br>
+          <strong>Population:</strong> ${(stop.total_pop || 0).toLocaleString()}<br>
+          <strong>Uninsured Rate:</strong> ${stop.pct_uninsured}% (${stop.uninsured_mult}x county avg)<br>
+          <strong>Vehicle Deficit:</strong> ${stop.pct_no_vehicle}% (${stop.vehicle_mult}x county avg)<br>
+          <strong>Safety-Net Distance:</strong> ${stop.km_to_safety_net} km (${stop.dist_diff > 0 ? '+' : ''}${stop.dist_diff} km vs avg)<br>
+          <strong>Facility:</strong> ${stop.parking_type || 'Civic Staging Facility'}
+        </div>
       </div>
     `);
   });
@@ -439,6 +847,16 @@ function selectStop(idx) {
   // Update floating overlay
   const overlay = document.getElementById("activeStopOverlay");
   document.getElementById("overlayDate").innerText = `${stop.saturday_label} (Stop #${idx + 1} • Rank #${stop.rank_overall})`;
+  const overlayFac = document.getElementById("overlayFacility");
+  if (overlayFac) {
+    if (stop.weather_mode === "rain") {
+      overlayFac.className = "apple-pill bg-blue-500/10 text-blue-700 border border-blue-500/20 font-medium ml-1 text-[10px]";
+      overlayFac.innerHTML = `<i class="fa-solid fa-warehouse mr-1"></i> ${stop.parking_type || 'Indoor Covered Deck'}`;
+    } else {
+      overlayFac.className = "apple-pill bg-amber-500/10 text-amber-800 border border-amber-500/20 font-medium ml-1 text-[10px]";
+      overlayFac.innerHTML = `<i class="fa-solid fa-square-parking mr-1"></i> ${stop.parking_type || 'Open Civic Plaza'}`;
+    }
+  }
   document.getElementById("overlayTract").innerText = `Census Tract ${stop.tract_id} (Pop: ${stop.total_pop.toLocaleString()})`;
   
   // Format reasoning bullets in the overlay
@@ -464,7 +882,7 @@ function closeOverlay() {
 
 async function loadTracts() {
   try {
-    const res = await fetch("api/tracts");
+    const res = await fetch(`api/tracts?county=${currentCounty}`);
     const tracts = await res.json();
     tractMarkersLayer.clearLayers();
 
@@ -487,15 +905,14 @@ async function loadTracts() {
         fillOpacity: 0.75
       }).addTo(tractMarkersLayer);
 
-      // Tooltip on hover
+      // Tooltip on hover: Formatted exactly like dropdown options
+      // "Rank #<rank> (Tract <tract_id> • Score <score> • Uninsured <pct>%)"
+      const rankPart = t.rank_overall ? `Rank #${t.rank_overall}` : `Tract ${t.geo_id}`;
+      const scorePart = t.composite_need_score ? ` • Score ${t.composite_need_score}` : '';
       centroidMarker.bindTooltip(`
-        <div style="font-family: sans-serif; font-size: 11px; padding: 2px;">
-          <strong style="color: #1e3a8a;">Tract Centroid: ${t.geo_id}</strong><br>
-          <span style="color: #64748b;">(${t.latitude.toFixed(4)}, ${t.longitude.toFixed(4)})</span><br>
-          <hr style="margin: 3px 0; border: none; border-top: 1px solid #e2e8f0;">
-          <strong>Uninsured:</strong> ${t.pct_uninsured}%<br>
-          <strong>No Vehicle:</strong> ${t.pct_no_vehicle}%<br>
-          <strong>Safety-Net Distance:</strong> ${t.km_to_safety_net} km
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; font-size: 11px; padding: 3px 6px; font-weight: 600; line-height: 1.3;">
+          <strong style="color: #1e3a8a;">${rankPart} (Tract ${t.geo_id}${scorePart} • Uninsured ${t.pct_uninsured}%)</strong><br>
+          <span style="font-weight: 400; color: #64748b; font-size: 10px;">No Vehicle: ${t.pct_no_vehicle}% | Safety-Net: ${t.km_to_safety_net} km</span>
         </div>
       `, { sticky: true, direction: "top" });
 
@@ -519,7 +936,7 @@ async function loadTracts() {
 
 async function loadCareSites() {
   try {
-    const res = await fetch("api/care_sites");
+    const res = await fetch(`api/care_sites?county=${currentCounty}`);
     const sites = await res.json();
     careSitesLayer.clearLayers();
 
@@ -537,10 +954,19 @@ async function loadCareSites() {
       });
 
       const marker = L.marker([s.latitude, s.longitude], { icon: icon }).addTo(careSitesLayer);
-      marker.bindPopup(`
-        <div style="font-size: 11px;">
+      
+      // Hover Tooltip: Clear identification of safety-net vs standard care site
+      marker.bindTooltip(`
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; font-size: 11px; padding: 3px 6px; font-weight: 600; line-height: 1.3;">
           <strong style="color: ${isFQHC ? '#059669' : '#334155'};">${s.name}</strong><br>
-          <span style="font-size: 10px; color: #666;">Type: ${s.site_kind || 'Standard Care'}</span><br>
+          <span style="font-weight: 400; color: #64748b; font-size: 10px;">${isFQHC ? '🏥 FQHC Safety-Net Provider' : 'Standard Health Care Facility'}</span>
+        </div>
+      `, { sticky: true, direction: "top" });
+
+      marker.bindPopup(`
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; font-size: 11px; line-height: 1.45;">
+          <strong style="color: ${isFQHC ? '#059669' : '#334155'}; font-size: 12px;">${s.name}</strong><br>
+          <span style="font-size: 10px; color: ${isFQHC ? '#059669' : '#64748b'}; font-weight: 600;">Type: ${s.site_kind || 'Standard Care'}</span><br>
           ${s.address}, ${s.city}<br>
           ${s.hours_per_week ? `<strong>Operating:</strong> ${s.hours_per_week} hrs/week` : ''}
         </div>
@@ -737,11 +1163,191 @@ async function execute3AgentPipeline() {
     window.latestFlyers = data.flyers || {};
     flierBox.innerText = window.latestFlyers.flier_en || "No flyer generated.";
 
+    // Render Weekly Decision Matrix (Adversarial Loop)
+    renderWeeklyDecisionMatrix(data.weekly_matrix || []);
+
   } catch (err) {
     verdictEl.innerText = `Pipeline failed: ${err.message}`;
   } finally {
     btn.disabled = false;
     btn.innerHTML = originalHTML;
+  }
+}
+
+function renderWeeklyDecisionMatrix(matrix) {
+  const container = document.getElementById("weeklyDecisionMatrix");
+  if (!container) return;
+  container.innerHTML = "";
+
+  if (matrix.length === 0) {
+    container.innerHTML = `<div class="text-slate-400 italic">No negotiation steps recorded.</div>`;
+    return;
+  }
+
+  matrix.forEach(m => {
+    const card = document.createElement("div");
+    card.className = "p-2 bg-white rounded border border-indigo-100 shadow-2xs space-y-1";
+    card.innerHTML = `
+      <div class="flex items-center justify-between font-bold text-slate-800">
+        <span>Week ${m.week} (${m.date})</span>
+        <span class="text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-mono text-[9px] border border-emerald-200">${m.final_verdict}</span>
+      </div>
+      <div class="text-slate-500 flex justify-between">
+        <span>Draft 1: Tract <code>${m.draft1_tract}</code> (Score ${m.draft1_score})</span>
+        <span class="text-amber-700">${m.round1_finding}</span>
+      </div>
+      <div class="text-indigo-900 bg-indigo-50/60 p-1 rounded border border-indigo-100 font-medium">
+        ↳ <strong>Auditor Action:</strong> ${m.action}
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function renderVetoPins(vetoStops) {
+  vetoMarkersLayer.clearLayers();
+  vetoStops.forEach(v => {
+    const icon = L.divIcon({
+      className: "veto-pin-icon",
+      html: `
+        <div style="background-color: #d97706; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid #ffffff; box-shadow: 0 0 8px rgba(217, 119, 6, 0.7); font-weight: bold; font-size: 11px;">
+          ❌${v.stop_number}
+        </div>
+      `,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14]
+    });
+
+    const marker = L.marker([v.lat, v.lon], { icon: icon }).addTo(vetoMarkersLayer);
+    marker.bindPopup(`
+      <div style="font-family: sans-serif; font-size: 12px; line-height: 1.4; max-width: 250px;">
+        <div style="color: #b45309; font-weight: bold; font-size: 12px; margin-bottom: 3px;">
+          ⚖️ ROUND 1 VETO PIN (STOP #${v.stop_number})
+        </div>
+        <strong>Tract:</strong> ${v.tract_id} (Rank #${v.rank_overall}, Score ${v.composite_need_score})<br>
+        <strong>Uninsured:</strong> ${v.pct_uninsured}% | <strong>No Car:</strong> ${v.pct_no_vehicle}%<br>
+        <hr style="margin: 4px 0; border: none; border-top: 1px solid #fde68a;">
+        <span style="color: #92400e; font-size: 11px;">${v.veto_reason}</span>
+      </div>
+    `);
+
+    // Add dashed exclusion radius circle
+    L.circle([v.lat, v.lon], {
+      radius: 1200,
+      color: "#d97706",
+      dashArray: "4, 6",
+      fillOpacity: 0.08,
+      weight: 1.5
+    }).addTo(vetoMarkersLayer);
+  });
+}
+
+// --- Booking Modal & Calendar Handlers ---
+
+let activeBookingStop = null;
+
+function openBookingModal(stop) {
+  activeBookingStop = stop;
+  const modal = document.getElementById("bookingModal");
+  if (!modal) return;
+
+  document.getElementById("bookingStopTitle").innerText = `${stop.saturday_label} - Tract ${stop.tract_id}`;
+  document.getElementById("bookingStopDetails").innerText = `Date: ${stop.date || 'Saturday'} (9:00 AM - 2:00 PM) • GPS: ${stop.lat.toFixed(4)}, ${stop.lon.toFixed(4)}`;
+
+  // Construct Google Calendar link
+  const title = encodeURIComponent(`Mobile Clinic Visit - Fulton County (Tract ${stop.tract_id})`);
+  const details = encodeURIComponent(`Free mobile health checkup, blood pressure & diabetes screening.\nLocation: Tract ${stop.tract_id} (${stop.lat}, ${stop.lon})\nNo insurance or ID required!`);
+  const loc = encodeURIComponent(`${stop.lat},${stop.lon}`);
+  
+  // Format date YYYYMMDD
+  const rawDate = (stop.date || "2026-11-07").replace(/-/g, "");
+  const gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${rawDate}T090000Z/${rawDate}T140000Z&details=${details}&location=${loc}`;
+  document.getElementById("addToGoogleCalBtn").href = gcalUrl;
+
+  document.getElementById("bookingConfirmation").classList.add("hidden");
+  modal.classList.remove("hidden");
+}
+
+function openQrModal(stop) {
+  const modal = document.getElementById("qrModal");
+  if (!modal) return;
+
+  const title = `${stop.saturday_label} - Census Tract ${stop.tract_id}`;
+  document.getElementById("qrModalTitle").innerText = title;
+  document.getElementById("qrModalSubtitle").innerText = `Date: ${stop.date || 'Saturday'} (9 AM - 2 PM). GPS: ${stop.lat.toFixed(4)}, ${stop.lon.toFixed(4)}`;
+
+  // Google Maps directions URL
+  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${stop.lat},${stop.lon}`;
+  document.getElementById("qrTargetUrl").innerText = mapsUrl;
+  document.getElementById("qrDirectMapsLink").href = mapsUrl;
+
+  // Use fast, reliable public QR API
+  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(mapsUrl)}`;
+  document.getElementById("qrImageDisplay").src = qrApiUrl;
+
+  modal.classList.remove("hidden");
+}
+
+function initModalListeners() {
+  const closeBook = document.getElementById("closeBookingModal");
+  if (closeBook) {
+    closeBook.addEventListener("click", () => {
+      document.getElementById("bookingModal").classList.add("hidden");
+    });
+  }
+
+  const closeQr = document.getElementById("closeQrModal");
+  if (closeQr) {
+    closeQr.addEventListener("click", () => {
+      document.getElementById("qrModal").classList.add("hidden");
+    });
+  }
+
+  const bookingForm = document.getElementById("bookingForm");
+  if (bookingForm) {
+    bookingForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const conf = document.getElementById("bookingConfirmation");
+      if (conf) conf.classList.remove("hidden");
+    });
+  }
+
+  const icalBtn = document.getElementById("downloadIcalBtn");
+  if (icalBtn) {
+    icalBtn.addEventListener("click", () => {
+      if (!activeBookingStop) return;
+      const s = activeBookingStop;
+      const rawDate = (s.date || "2026-11-07").replace(/-/g, "");
+      const icsData = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Fulton County Mobile Health Van//EN",
+        "BEGIN:VEVENT",
+        `SUMMARY:Mobile Clinic Visit - Fulton County (Tract ${s.tract_id})`,
+        `DESCRIPTION:Free health checkup, blood pressure & diabetes screening. No insurance or ID needed!`,
+        `LOCATION:${s.lat},${s.lon}`,
+        `DTSTART:${rawDate}T090000Z`,
+        `DTEND:${rawDate}T140000Z`,
+        "STATUS:CONFIRMED",
+        "END:VEVENT",
+        "END:VCALENDAR"
+      ].join("\r\n");
+
+      const blob = new Blob([icsData], { type: "text/calendar;charset=utf-8" });
+      const link = document.createElement("a");
+      link.href = window.URL.createObjectURL(blob);
+      link.setAttribute("download", `mobile_clinic_stop_${s.tract_id}.ics`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+  }
+
+  const printQrBtn = document.getElementById("qrPrintBtn");
+  if (printQrBtn) {
+    printQrBtn.addEventListener("click", () => {
+      window.print();
+    });
   }
 }
 
